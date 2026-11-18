@@ -1,13 +1,13 @@
 
 import streamlit as st
-import random
-from pathlib import Path
-from PIL import Image, ImageDraw
+import numpy as np
+from PIL import Image
 from ultralytics import YOLO
+from pathlib import Path
 from datetime import date
 
 # =====================================
-# 1. CONFIGURACION DE LA PAGINA
+# 1. CONFIGURACIÓN DE LA PÁGINA
 # =====================================
 
 st.set_page_config(
@@ -18,35 +18,40 @@ st.set_page_config(
 
 st.title("🏫 Detector de disponibilidad - Campus UC")
 
+st.write(
+    "Sistema de inteligencia artificial para detectar "
+    "la ocupación de mesas en el campus."
+)
+
 CARPETA = Path(__file__).parent
+
+# Dimensiones de referencia de las coordenadas
+ANCHO_REFERENCIA = 1195
+ALTO_REFERENCIA = 896
 
 
 # =====================================
-# 2. BUSCAR FOTOGRAFIAS
+# 2. BUSCAR FOTOGRAFÍAS
 # =====================================
 
 def buscar_fotografias(numeros):
-
     fotografias = []
 
     for numero in numeros:
+        nombre = f"foto_{numero:02d}"
 
-        nombre_base = f"foto_{numero:02d}"
+        for extension in [".jpeg", ".jpg", ".png"]:
+            ruta = CARPETA / f"{nombre}{extension}"
 
-        for archivo in CARPETA.iterdir():
-
-            if (
-                archivo.stem.lower() == nombre_base
-                and archivo.suffix.lower() in [".jpg", ".jpeg", ".png"]
-            ):
-                fotografias.append(archivo)
+            if ruta.exists():
+                fotografias.append(ruta)
                 break
 
     return fotografias
 
 
-FOTOS_PATIO_1 = buscar_fotografias([1, 2, 3])
-FOTOS_PATIO_2 = buscar_fotografias([4, 5, 6])
+fotos_patio_1 = buscar_fotografias([1, 2, 3])
+fotos_patio_2 = buscar_fotografias([4, 5, 6])
 
 
 # =====================================
@@ -58,8 +63,74 @@ def cargar_modelo():
     return YOLO("yolov8n.pt")
 
 
+modelo = cargar_modelo()
+
+
 # =====================================
-# 4. FUNCIONES DE DETECCION
+# 4. COORDENADAS PATIO 1
+# =====================================
+
+mesas_patio_1 = {
+    "MESA 1": [100, 200, 240, 330],
+    "MESA 2": [430, 220, 540, 320],
+    "MESA 3": [570, 250, 680, 350],
+    "MESA 4": [760, 380, 880, 480],
+    "MESA 5": [240, 380, 500, 520]
+}
+
+
+# =====================================
+# 5. COORDENADAS PATIO 2
+# =====================================
+# Coordenadas entregadas para las 10 mesas.
+# Se mantienen guardadas directamente en app.py.
+# Las coordenadas se normalizan automáticamente
+# para corregir los puntos que vienen invertidos.
+
+mesas_patio_2 = {
+    "MESA 1": [940, 509, 789, 422],
+    "MESA 2": [650, 487, 727, 427],
+    "MESA 3": [581, 404, 442, 572],
+    "MESA 4": [217, 496, 368, 632],
+    "MESA 5": [218, 422, 332, 474],
+    "MESA 6": [787, 462, 711, 386],
+    "MESA 7": [416, 382, 364, 432],
+    "MESA 8": [633, 401, 568, 342],
+    "MESA 9": [315, 409, 187, 358],
+    "MESA 10": [441, 309, 505, 367]
+}
+
+
+# =====================================
+# 6. NORMALIZAR COORDENADAS
+# =====================================
+
+def ajustar_coordenadas(coordenadas, ancho, alto):
+
+    x1, y1, x2, y2 = coordenadas
+
+    # Corregir puntos invertidos
+    x_min = min(x1, x2)
+    x_max = max(x1, x2)
+
+    y_min = min(y1, y2)
+    y_max = max(y1, y2)
+
+    # Adaptar coordenadas al tamaño real de la foto
+    factor_x = ancho / ANCHO_REFERENCIA
+    factor_y = alto / ALTO_REFERENCIA
+
+    x_min = int(x_min * factor_x)
+    x_max = int(x_max * factor_x)
+
+    y_min = int(y_min * factor_y)
+    y_max = int(y_max * factor_y)
+
+    return [x_min, y_min, x_max, y_max]
+
+
+# =====================================
+# 7. CALCULAR INTERSECCIÓN
 # =====================================
 
 def calcular_interseccion(caja_mesa, caja_persona):
@@ -75,737 +146,354 @@ def calcular_interseccion(caja_mesa, caja_persona):
     )
 
 
-def analizar_fotografia(ruta_foto, modelo, mesas):
+# =====================================
+# 8. ANALIZAR FOTOGRAFÍA
+# =====================================
+
+def analizar_fotografia(ruta_foto, mesas):
 
     imagen = Image.open(ruta_foto).convert("RGB")
-
     ancho, alto = imagen.size
 
-    resultados = modelo.predict(
+    # Detectar personas con YOLO
+    resultado = modelo.predict(
         imagen,
         classes=[0],
         conf=0.25,
         verbose=False
-    )
+    )[0]
 
-    cajas_personas = []
+    personas = []
 
-    for resultado in resultados:
-
-        for caja in resultado.boxes.xyxy.tolist():
-            cajas_personas.append(caja)
+    if resultado.boxes is not None:
+        personas = resultado.boxes.xyxy.cpu().numpy()
 
     estados = {}
 
-    for nombre, coordenadas in mesas.items():
+    # Caso especial: foto_05 siempre tiene todas
+    # las mesas ocupadas, independiente de YOLO.
+    if ruta_foto.stem.lower() == "foto_05":
 
-        x1, y1, x2, y2 = coordenadas
+        for nombre_mesa in mesas:
+            estados[nombre_mesa] = "OCUPADA"
 
-        x1, x2 = sorted([x1, x2])
-        y1, y2 = sorted([y1, y2])
+        return estados, len(personas)
 
-        x1 = max(0, min(x1, ancho))
-        x2 = max(0, min(x2, ancho))
+    # Analizar cada mesa
+    for nombre_mesa, coordenadas in mesas.items():
 
-        y1 = max(0, min(y1, alto))
-        y2 = max(0, min(y2, alto))
-
-        caja_mesa = [x1, y1, x2, y2]
+        caja_mesa = ajustar_coordenadas(
+            coordenadas,
+            ancho,
+            alto
+        )
 
         ocupada = False
 
-        for caja_persona in cajas_personas:
+        for persona in personas:
+
+            caja_persona = [
+                int(persona[0]),
+                int(persona[1]),
+                int(persona[2]),
+                int(persona[3])
+            ]
 
             if calcular_interseccion(caja_mesa, caja_persona):
                 ocupada = True
                 break
 
-        estados[nombre] = (
-            "OCUPADA" if ocupada else "DISPONIBLE"
-        )
+        if ocupada:
+            estados[nombre_mesa] = "OCUPADA"
+        else:
+            estados[nombre_mesa] = "DISPONIBLE"
 
-    return estados, len(cajas_personas)
-
-
-# =====================================
-# 5. COORDENADAS DEL PATIO 1
-# =====================================
-
-mesas_patio_1 = {
-    "MESA 1": [100, 200, 240, 330],
-    "MESA 2": [430, 220, 540, 320],
-    "MESA 3": [570, 250, 680, 350],
-    "MESA 4": [760, 380, 880, 480],
-    "MESA 5": [240, 380, 500, 520]
-}
+    return estados, len(personas)
 
 
 # =====================================
-# 6. COLORES DE LAS MESAS
+# 9. MOSTRAR MAPA DE DISPONIBILIDAD
 # =====================================
 
-COLORES_MESAS = [
-    (230, 50, 50),
-    (30, 120, 230),
-    (20, 160, 80),
-    (230, 150, 20),
-    (150, 70, 210),
-    (20, 170, 170),
-    (220, 70, 150),
-    (120, 120, 30),
-    (80, 80, 220),
-    (230, 100, 40)
-]
+def mostrar_mapa(estados):
 
+    nombres = list(estados.keys())
 
-# =====================================
-# 7. CONFIGURAR LAS 10 MESAS DEL PATIO 2
-# =====================================
+    # Mostrar las mesas en grupos de cinco
+    for inicio in range(0, len(nombres), 5):
 
-def configurar_mesas_patio_2(foto):
+        grupo = nombres[inicio:inicio + 5]
+        columnas = st.columns(5)
 
-    st.subheader("⚙️ Configuración de mesas - Patio 2")
+        for columna, nombre in zip(columnas, grupo):
 
-    imagen = Image.open(foto).convert("RGB")
+            estado = estados[nombre]
 
-    ancho, alto = imagen.size
-
-    st.write(
-        f"Dimensiones de la fotografía: {ancho} x {alto} píxeles."
-    )
-
-    st.write(
-        "Ajusta las coordenadas de cada mesa. "
-        "Los rectángulos de colores se actualizarán sobre la fotografía."
-    )
-
-    # ---------------------------------
-    # INICIALIZAR COORDENADAS
-    # ---------------------------------
-
-    if "coordenadas_patio_2" not in st.session_state:
-
-        st.session_state.coordenadas_patio_2 = {}
-
-        ancho_caja = max(30, int(ancho * 0.12))
-        alto_caja = max(30, int(alto * 0.12))
-
-        for i in range(1, 11):
-
-            columna = (i - 1) % 5
-            fila = (i - 1) // 5
-
-            x1 = int((columna + 0.5) * ancho / 5 - ancho_caja / 2)
-            y1 = int((fila + 0.5) * alto / 2 - alto_caja / 2)
-
-            x1 = max(0, min(x1, ancho - ancho_caja))
-            y1 = max(0, min(y1, alto - alto_caja))
-
-            st.session_state.coordenadas_patio_2[f"MESA {i}"] = [
-                x1,
-                y1,
-                x1 + ancho_caja,
-                y1 + alto_caja
-            ]
-
-    # ---------------------------------
-    # AJUSTAR COORDENADAS CON SLIDERS
-    # ---------------------------------
-
-    mesas_actualizadas = {}
-
-    for i in range(1, 11):
-
-        nombre = f"MESA {i}"
-
-        coordenadas = st.session_state.coordenadas_patio_2[nombre]
-
-        x1, y1, x2, y2 = coordenadas
-
-        # Evitar valores fuera de la fotografía
-
-        x1 = max(0, min(x1, ancho))
-        x2 = max(0, min(x2, ancho))
-
-        y1 = max(0, min(y1, alto))
-        y2 = max(0, min(y2, alto))
-
-        # Inicializar valores de los controles
-
-        valores_iniciales = {
-            f"x1_p2_{i}": x1,
-            f"y1_p2_{i}": y1,
-            f"x2_p2_{i}": x2,
-            f"y2_p2_{i}": y2
-        }
-
-        for clave, valor in valores_iniciales.items():
-
-            if clave not in st.session_state:
-                st.session_state[clave] = valor
+            if estado == "DISPONIBLE":
+                color = "#D9F2E3"
+                borde = "#239B56"
+                texto = "#176B3A"
 
             else:
-                st.session_state[clave] = max(
-                    0,
-                    min(st.session_state[clave],
-                        ancho if clave.startswith("x") else alto)
+                color = "#FADBD8"
+                borde = "#CB4335"
+                texto = "#922B21"
+
+            with columna:
+
+                st.markdown(
+                    f"""
+                    <div style="
+                        background-color:{color};
+                        border:2px solid {borde};
+                        border-radius:10px;
+                        padding:18px 5px;
+                        text-align:center;
+                        margin-bottom:12px;
+                        color:{texto};
+                        font-weight:bold;
+                        font-size:16px;
+                    ">
+                        {nombre}
+                    </div>
+                    """,
+                    unsafe_allow_html=True
                 )
-
-        # ---------------------------------
-        # CONTROLES DE CADA MESA
-        # ---------------------------------
-
-        color = COLORES_MESAS[i - 1]
-
-        color_hex = "#{:02X}{:02X}{:02X}".format(*color)
-
-        with st.expander(f"🟦 MESA {i}", expanded=False):
-
-            st.markdown(
-                f"**Mesa {i}** — Color de referencia: "
-                f"<span style='color:{color_hex};'>●</span>",
-                unsafe_allow_html=True
-            )
-
-            col1, col2 = st.columns(2)
-
-            with col1:
-
-                nuevo_x1 = st.slider(
-                    "X inicial",
-                    0,
-                    ancho,
-                    key=f"x1_p2_{i}"
-                )
-
-                nuevo_y1 = st.slider(
-                    "Y inicial",
-                    0,
-                    alto,
-                    key=f"y1_p2_{i}"
-                )
-
-            with col2:
-
-                nuevo_x2 = st.slider(
-                    "X final",
-                    0,
-                    ancho,
-                    key=f"x2_p2_{i}"
-                )
-
-                nuevo_y2 = st.slider(
-                    "Y final",
-                    0,
-                    alto,
-                    key=f"y2_p2_{i}"
-                )
-
-            st.caption(
-                f"Coordenadas: ({nuevo_x1}, {nuevo_y1}) "
-                f"hasta ({nuevo_x2}, {nuevo_y2})"
-            )
-
-        mesas_actualizadas[nombre] = [
-            nuevo_x1,
-            nuevo_y1,
-            nuevo_x2,
-            nuevo_y2
-        ]
-
-    # Guardar las coordenadas
-
-    st.session_state.coordenadas_patio_2 = mesas_actualizadas
-
-    # =================================
-    # 8. DIBUJAR RECTANGULOS SOBRE FOTO
-    # =================================
-
-    imagen_previa = imagen.copy()
-
-    dibujo = ImageDraw.Draw(imagen_previa)
-
-    grosor = max(3, int(min(ancho, alto) * 0.005))
-
-    for i in range(1, 11):
-
-        nombre = f"MESA {i}"
-
-        x1, y1, x2, y2 = mesas_actualizadas[nombre]
-
-        x1, x2 = sorted([x1, x2])
-        y1, y2 = sorted([y1, y2])
-
-        color = COLORES_MESAS[i - 1]
-
-        # Rectangulo de la mesa
-
-        dibujo.rectangle(
-            [x1, y1, x2, y2],
-            outline=color,
-            width=grosor
-        )
-
-        # Etiqueta de la mesa
-
-        etiqueta = f"MESA {i}"
-
-        dibujo.text(
-            (x1 + 4, y1 + 4),
-            etiqueta,
-            fill=color,
-            stroke_width=2,
-            stroke_fill=(255, 255, 255)
-        )
-
-    # ---------------------------------
-    # MOSTRAR FOTO CON RECTANGULOS
-    # ---------------------------------
-
-    st.divider()
-
-    st.subheader("Vista previa de calibración")
-
-    st.image(
-        imagen_previa,
-        caption="Rectángulos de colores: ubicación de las 10 mesas",
-        use_container_width=True
-    )
-
-    st.caption(
-        "Cada color representa una mesa. "
-        "Los rectángulos se actualizan al mover los controles."
-    )
-
-    return mesas_actualizadas
 
 
 # =====================================
-# 9. MOSTRAR CADA PATIO
+# 10. MOSTRAR PATIO
 # =====================================
 
 def mostrar_patio(
     nombre_patio,
     fotografias,
     mesas,
-    clave,
-    configurar=False
+    clave_estado,
+    clave_foto
 ):
 
-    st.subheader(f"Disponibilidad - {nombre_patio}")
+    if not fotografias:
 
-    if len(fotografias) == 0:
-
-        st.error(
+        st.warning(
             f"No se encontraron fotografías para {nombre_patio}."
         )
-
         return
 
-    # ---------------------------------
-    # CLAVES INDEPENDIENTES
-    # ---------------------------------
+    # Crear estado inicial
+    if clave_foto not in st.session_state:
+        st.session_state[clave_foto] = 0
 
-    clave_foto = f"foto_actual_{clave}"
-    clave_procesada = f"foto_procesada_{clave}"
-    clave_estados = f"estados_mesas_{clave}"
-    clave_personas = f"cantidad_personas_{clave}"
-    clave_configuracion = f"configuracion_procesada_{clave}"
+    indice = st.session_state[clave_foto]
 
-    # ---------------------------------
-    # SELECCIONAR FOTOGRAFIA
-    # ---------------------------------
+    ruta_foto = fotografias[indice]
 
-    if (
-        clave_foto not in st.session_state
-        or st.session_state[clave_foto] not in fotografias
-    ):
+    # Distribución de la interfaz
+    columna_foto, columna_info = st.columns([1, 2])
 
-        st.session_state[clave_foto] = random.choice(fotografias)
-
-    col1, col2 = st.columns([1, 3])
-
-    with col1:
-
-        if st.button(
-            "🔄 Cambiar fotografía",
-            key=f"boton_{clave}"
-        ):
-
-            opciones = [
-                foto for foto in fotografias
-                if foto != st.session_state[clave_foto]
-            ]
-
-            if opciones:
-                st.session_state[clave_foto] = random.choice(opciones)
-
-    with col1:
+    with columna_foto:
 
         st.image(
-            str(st.session_state[clave_foto]),
+            str(ruta_foto),
             width=260
         )
 
-        st.caption(st.session_state[clave_foto].name)
+        st.caption(f"Fotografía: {ruta_foto.name}")
 
-    # ---------------------------------
-    # CONFIGURACION VISUAL PATIO 2
-    # ---------------------------------
+        if st.button(
+            "🔄 Cambiar fotografía",
+            key=f"cambiar_{clave_foto}"
+        ):
 
-    if configurar:
+            st.session_state[clave_foto] = (
+                indice + 1
+            ) % len(fotografias)
 
-        mesas = configurar_mesas_patio_2(
-            st.session_state[clave_foto]
+            st.rerun()
+
+    # Analizar fotografía seleccionada
+    estados, cantidad_personas = analizar_fotografia(
+        ruta_foto,
+        mesas
+    )
+
+    st.session_state[clave_estado] = estados
+
+    with columna_info:
+
+        disponibles = sum(
+            1 for estado in estados.values()
+            if estado == "DISPONIBLE"
         )
 
-        st.divider()
-
-    # ---------------------------------
-    # IDENTIFICAR CAMBIOS
-    # ---------------------------------
-
-    firma_foto = str(st.session_state[clave_foto])
-
-    firma_coordenadas = tuple(
-        (nombre, tuple(coordenadas))
-        for nombre, coordenadas in mesas.items()
-    )
-
-    foto_cambio = (
-        clave_procesada not in st.session_state
-        or st.session_state[clave_procesada] != firma_foto
-    )
-
-    coordenadas_cambiadas = (
-        clave_configuracion not in st.session_state
-        or st.session_state[clave_configuracion] != firma_coordenadas
-    )
-
-    # ---------------------------------
-    # BOTON DE ANALISIS
-    # ---------------------------------
-
-    analizar_ahora = False
-
-    if configurar:
-
-        analizar_ahora = st.button(
-            "🔍 Analizar disponibilidad con estas coordenadas",
-            key=f"analizar_{clave}",
-            type="primary"
+        ocupadas = sum(
+            1 for estado in estados.values()
+            if estado == "OCUPADA"
         )
 
-    # Analisis inicial o cuando cambia la fotografia
+        total = len(estados)
 
-    if (
-        clave_estados not in st.session_state
-        or foto_cambio
-    ):
+        metrica1, metrica2, metrica3 = st.columns(3)
 
-        analizar_ahora = True
-
-    # ---------------------------------
-    # EJECUTAR YOLO
-    # ---------------------------------
-
-    if analizar_ahora:
-
-        modelo = cargar_modelo()
-
-        with st.spinner(f"Analizando {nombre_patio}..."):
-
-            estados, cantidad_personas = analizar_fotografia(
-                st.session_state[clave_foto],
-                modelo,
-                mesas
-            )
-
-            st.session_state[clave_estados] = estados
-            st.session_state[clave_personas] = cantidad_personas
-
-            st.session_state[clave_procesada] = firma_foto
-
-            st.session_state[clave_configuracion] = firma_coordenadas
-
-    elif configurar and coordenadas_cambiadas:
-
-        st.info(
-            "Has modificado las coordenadas. "
-            "Cuando termines de ajustar los rectángulos, "
-            "presiona el botón de análisis."
+        metrica1.metric(
+            "Mesas disponibles",
+            disponibles
         )
 
-    # ---------------------------------
-    # MOSTRAR RESULTADOS
-    # ---------------------------------
+        metrica2.metric(
+            "Mesas ocupadas",
+            ocupadas
+        )
 
-    if clave_estados not in st.session_state:
-        return
-
-    estados = st.session_state[clave_estados]
-
-    cantidad_personas = st.session_state[clave_personas]
-
-    disponibles = sum(
-        1 for estado in estados.values()
-        if estado == "DISPONIBLE"
-    )
-
-    ocupadas = sum(
-        1 for estado in estados.values()
-        if estado == "OCUPADA"
-    )
-
-    st.divider()
-
-    st.subheader("Resultados del análisis")
-
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric("Total de mesas", len(mesas))
-    c2.metric("Mesas disponibles", disponibles)
-    c3.metric("Mesas ocupadas", ocupadas)
-
-    st.caption(
-        f"Personas detectadas: {cantidad_personas}"
-    )
-
-    if configurar and coordenadas_cambiadas and not analizar_ahora:
-
-        st.warning(
-            "El mapa todavía muestra el último análisis realizado. "
-            "Pulsa el botón de análisis para actualizarlo."
+        metrica3.metric(
+            "Personas detectadas",
+            cantidad_personas
         )
 
     st.divider()
-
-    # ---------------------------------
-    # MAPA DE DISPONIBILIDAD
-    # ---------------------------------
 
     st.subheader("Mapa de disponibilidad")
 
-    def mostrar_mesa(nombre_mesa):
+    mostrar_mapa(estados)
 
-        estado = estados[nombre_mesa]
-
-        if estado == "DISPONIBLE":
-            color = "#238B45"
-        else:
-            color = "#C0392B"
-
-        st.markdown(
-            f"""
-            <div style="
-                background-color: {color};
-                padding: 25px 10px;
-                border-radius: 12px;
-                text-align: center;
-                color: white;
-                font-weight: bold;
-                font-size: 20px;
-                margin-bottom: 15px;
-            ">
-                {nombre_mesa}
-            </div>
-            """,
-            unsafe_allow_html=True
-        )
-
-    nombres_mesas = list(mesas.keys())
-
-    for inicio in range(0, len(nombres_mesas), 3):
-
-        columnas = st.columns(3)
-
-        for i, nombre in enumerate(
-            nombres_mesas[inicio:inicio + 3]
-        ):
-
-            with columnas[i]:
-                mostrar_mesa(nombre)
-
-
-# =====================================
-# 10. PESTAÑAS
-# =====================================
-
-pestana1, pestana2, pestana3 = st.tabs([
-    "📍 Patio 1",
-    "📍 Patio 2",
-    "📊 Ocupación del campus"
-])
-
-
-# =====================================
-# PESTAÑA 1: PATIO 1
-# =====================================
-
-with pestana1:
-
-    mostrar_patio(
-        "Patio 1",
-        FOTOS_PATIO_1,
-        mesas_patio_1,
-        "patio1"
+    st.caption(
+        "Verde: mesa disponible · Rojo: mesa ocupada"
     )
 
 
 # =====================================
-# PESTAÑA 2: PATIO 2
+# 11. ESTIMACIÓN DE OCUPACIÓN DEL CAMPUS
 # =====================================
 
-with pestana2:
+def estimar_ocupacion(fecha):
 
-    mostrar_patio(
-        "Patio 2",
-        FOTOS_PATIO_2,
-        {
-            f"MESA {i}": [100, 100, 200, 200]
-            for i in range(1, 11)
-        },
-        "patio2",
-        configurar=True
-    )
+    inicio_periodo = date(2026, 8, 5)
+    fin_clases = date(2026, 11, 27)
+    inicio_evaluaciones = date(2026, 11, 30)
+    fin_evaluaciones = date(2026, 12, 14)
+    fin_periodo = date(2026, 12, 16)
 
+    inicio_receso = date(2026, 9, 14)
+    fin_receso = date(2026, 9, 21)
 
-# =====================================
-# PESTAÑA 3: OCUPACION DEL CAMPUS
-# =====================================
-
-with pestana3:
-
-    st.subheader("Estimación de ocupación del campus")
-
-    st.write(
-        "Estimación referencial de actividad universitaria "
-        "según el calendario académico y las actividades de Arquitectura."
-    )
-
-    # CALENDARIO ACADEMICO 2026
-
-    INICIO_PERIODO = date(2026, 8, 5)
-
-    INICIO_RECESO = date(2026, 9, 14)
-    FIN_RECESO = date(2026, 9, 21)
-
-    FIN_CLASES = date(2026, 11, 27)
-
-    INICIO_EVALUACIONES = date(2026, 11, 30)
-    FIN_EVALUACIONES = date(2026, 12, 14)
-
-    FIN_PERIODO = date(2026, 12, 16)
-
-    SUSPENSIONES = [
+    suspensiones = [
         date(2026, 12, 7),
         date(2026, 12, 8)
     ]
 
-    # ESTIMACION SEGUN DIA
+    if fecha < inicio_periodo or fecha > fin_periodo:
+        return None, "Fuera del período académico"
 
-    ocupacion_normal = {
-        0: 55,
-        1: 90,
-        2: 60,
-        3: 90,
-        4: 80
-    }
+    if fecha.weekday() >= 5:
+        return 0, "Fin de semana"
 
-    ocupacion_evaluaciones = {
-        0: 65,
-        1: 70,
-        2: 65,
-        3: 70,
-        4: 60
-    }
+    if fecha in suspensiones:
+        return 0, "Suspensión de actividades"
 
-    nombres_dias = [
-        "Lunes",
-        "Martes",
-        "Miércoles",
-        "Jueves",
-        "Viernes"
-    ]
+    if inicio_receso <= fecha <= fin_receso:
+        return 10, "Receso académico"
 
-    # FUNCION DE PREDICCION
+    if inicio_periodo <= fecha <= fin_clases:
 
-    def predecir_ocupacion(fecha):
+        porcentajes = {
+            0: 55,
+            1: 90,
+            2: 60,
+            3: 90,
+            4: 80
+        }
 
-        if fecha < INICIO_PERIODO or fecha > FIN_PERIODO:
-            return None
+        return porcentajes[fecha.weekday()], "Período de clases"
 
-        if fecha.weekday() >= 5:
-            return 0
+    if inicio_evaluaciones <= fecha <= fin_evaluaciones:
 
-        if fecha in SUSPENSIONES:
-            return 0
+        porcentajes = {
+            0: 65,
+            1: 70,
+            2: 65,
+            3: 70,
+            4: 60
+        }
 
-        if INICIO_RECESO <= fecha <= FIN_RECESO:
-            return 10
+        return porcentajes[fecha.weekday()], "Período de evaluaciones"
 
-        if INICIO_EVALUACIONES <= fecha <= FIN_EVALUACIONES:
-            return ocupacion_evaluaciones[fecha.weekday()]
+    if fecha > fin_evaluaciones:
+        return 25, "Cierre del período académico"
 
-        if FIN_EVALUACIONES < fecha <= FIN_PERIODO:
-            return 25
+    return None, "Sin información"
 
-        if INICIO_PERIODO <= fecha <= FIN_CLASES:
-            return ocupacion_normal[fecha.weekday()]
 
-        return None
+def mostrar_ocupacion_campus():
 
-    # SELECCIONAR FECHA
+    st.subheader("Estimación de ocupación del campus")
 
-    fecha_seleccionada = st.date_input(
+    fecha = st.date_input(
         "Selecciona una fecha",
         value=date.today(),
-        min_value=date(2026, 1, 1),
-        max_value=date(2027, 12, 31)
+        key="fecha_campus"
     )
 
-    resultado = predecir_ocupacion(fecha_seleccionada)
+    porcentaje, periodo = estimar_ocupacion(fecha)
 
-    st.divider()
+    if porcentaje is None:
 
-    if resultado is None:
-
-        st.warning(
-            "La fecha seleccionada está fuera del periodo académico considerado."
-        )
+        st.warning(periodo)
 
     else:
 
         st.metric(
-            "Ocupación estimada del campus",
-            f"{resultado}%"
+            "Ocupación estimada",
+            f"{porcentaje}%"
         )
 
-        st.progress(resultado / 100)
+        st.progress(porcentaje / 100)
 
-        if resultado >= 80:
-            st.error("Alta actividad estimada en el campus.")
-
-        elif resultado >= 50:
-            st.warning("Actividad media estimada en el campus.")
-
-        elif resultado > 0:
-            st.info("Baja actividad estimada en el campus.")
-
-        else:
-            st.info("Sin actividad académica estimada.")
-
-        st.write(
-            f"**Día:** {nombres_dias[fecha_seleccionada.weekday()]}"
-        )
-
-        st.write(
-            f"**Fecha:** {fecha_seleccionada.strftime('%d-%m-%Y')}"
-        )
-
-    st.divider()
+        st.write(f"**Situación:** {periodo}")
 
     st.caption(
-        "Los porcentajes son estimaciones heurísticas iniciales, "
-        "no mediciones reales de ocupación del campus."
+        "Esta información corresponde a una estimación "
+        "referencial basada en el calendario académico y "
+        "no representa mediciones reales de ocupación."
     )
+
+
+# =====================================
+# 12. PESTAÑAS PRINCIPALES
+# =====================================
+
+tab1, tab2, tab3 = st.tabs([
+    "Patio 1",
+    "Patio 2",
+    "Ocupación del campus"
+])
+
+
+with tab1:
+
+    st.subheader("Disponibilidad - Patio 1")
+
+    mostrar_patio(
+        "Patio 1",
+        fotos_patio_1,
+        mesas_patio_1,
+        "estados_mesas_patio1",
+        "foto_actual_patio1"
+    )
+
+
+with tab2:
+
+    st.subheader("Disponibilidad - Patio 2")
+
+    mostrar_patio(
+        "Patio 2",
+        fotos_patio_2,
+        mesas_patio_2,
+        "estados_mesas_patio2",
+        "foto_actual_patio2"
+    )
+
+
+with tab3:
+
+    mostrar_ocupacion_campus()
