@@ -1,35 +1,30 @@
 
 import streamlit as st
+import numpy as np
+import pandas as pd
 from PIL import Image
 from ultralytics import YOLO
 from pathlib import Path
-from datetime import date
+from datetime import date, datetime, time
 
-# =============================================
+# =========================================
 # 1. CONFIGURACIÓN DE LA PÁGINA
-# =============================================
+# =========================================
 
 st.set_page_config(
-    page_title="Smart Campus UC",
+    page_title="Gemelo Digital Lo Contador",
     page_icon="🏫",
     layout="wide"
 )
 
 CARPETA = Path(__file__).parent
 
-ANCHO_REFERENCIA = 1195
-ALTO_REFERENCIA = 896
-
-
-# =============================================
-# 2. DISEÑO VISUAL
-# =============================================
+# =========================================
+# 2. ESTILOS DE LA INTERFAZ
+# =========================================
 
 st.markdown("""
 <style>
-.stApp {
-    background-color: #F4F7FB;
-}
 
 #MainMenu {
     visibility: hidden;
@@ -39,252 +34,234 @@ footer {
     visibility: hidden;
 }
 
+header[data-testid="stHeader"] {
+    background: transparent;
+}
+
 .block-container {
-    padding-top: 2rem;
-    padding-bottom: 3rem;
     max-width: 1450px;
+    padding-top: 1.5rem;
+    padding-bottom: 3rem;
+}
+
+body {
+    background-color: #F4F7FB;
+}
+
+.stApp {
+    background-color: #F4F7FB;
 }
 
 h1, h2, h3 {
-    color: #183B5B !important;
-    font-weight: 750 !important;
-}
-
-p, label {
-    color: #526477;
+    color: #142D4E;
 }
 
 .stTabs [data-baseweb="tab-list"] {
     gap: 12px;
-    border-bottom: 1px solid #DCE5EF;
+    border-bottom: 1px solid #DCE4ED;
 }
 
 .stTabs [data-baseweb="tab"] {
-    background-color: #E8EEF5;
-    border-radius: 10px 10px 0 0;
-    padding: 12px 22px;
-    color: #38536F;
+    color: #52677E;
     font-weight: 600;
+    padding: 12px 20px;
 }
 
 .stTabs [aria-selected="true"] {
-    background-color: #183B5B !important;
-    color: white !important;
-}
-
-[data-testid="stMetric"] {
-    background-color: white;
-    border: 1px solid #E2EAF2;
-    border-radius: 14px;
-    padding: 18px;
-    box-shadow: 0 3px 12px rgba(25,55,85,0.05);
-}
-
-[data-testid="stMetricValue"] {
-    color: #183B5B;
-    font-weight: 800;
+    color: #1E5A91 !important;
+    border-bottom-color: #1E5A91 !important;
 }
 
 .stButton > button {
-    background-color: #183B5B;
+    background-color: #173D65;
     color: white;
     border: none;
-    border-radius: 10px;
-    padding: 10px 20px;
+    border-radius: 9px;
+    padding: 9px 18px;
     font-weight: 600;
-    transition: 0.2s;
 }
 
 .stButton > button:hover {
-    background-color: #28577E;
+    background-color: #285F91;
     color: white;
     border: none;
 }
 
-[data-testid="stDateInput"] input {
-    border-radius: 10px;
-    border: 1px solid #D5E0EB;
-}
-
-[data-testid="stTable"] {
+div[data-testid="stMetric"] {
     background-color: white;
+    padding: 18px;
     border-radius: 12px;
-    overflow: hidden;
+    border: 1px solid #E2E9F1;
+    box-shadow: 0 2px 8px rgba(20,45,78,0.04);
 }
 
-[data-testid="stImage"] img {
-    border-radius: 14px;
+div[data-testid="stMetricLabel"] {
+    color: #62758B;
+    font-weight: 600;
 }
 
-.stProgress > div > div > div {
-    background-color: #25845B;
+div[data-testid="stMetricValue"] {
+    color: #173D65;
 }
 
-[data-testid="stAlert"] {
-    border-radius: 12px;
+div[data-testid="stImage"] img {
+    border-radius: 10px;
 }
 
-hr {
-    border-color: #DCE5EF;
-}
 </style>
 """, unsafe_allow_html=True)
 
 
-# =============================================
-# 3. ENCABEZADO PRINCIPAL
-# =============================================
+# =========================================
+# 3. LOGO SUPERIOR
+# =========================================
 
-st.html("""
-<div style="
-    background: linear-gradient(115deg, #142D4E, #28577E);
-    padding: 32px;
-    border-radius: 18px;
-    margin-bottom: 25px;
-    box-shadow: 0 5px 18px rgba(20,45,78,0.12);
-">
+RUTA_LOGO = CARPETA / "logo_gemelo.png"
 
-    <div style="
-        color: #AFC9E1;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 2px;
-    ">
-        SMART CAMPUS · UNIVERSIDAD CATÓLICA
-    </div>
+if RUTA_LOGO.exists():
+    col1, col2, col3 = st.columns([1, 2, 1])
 
-    <div style="
-        color: white;
-        font-size: 32px;
-        font-weight: 800;
-        margin-top: 10px;
-    ">
-        Gestión inteligente de espacios
-    </div>
-
-    <div style="
-        color: #D5E3F0;
-        font-size: 15px;
-        margin-top: 8px;
-    ">
-        Detección de disponibilidad y predicción de ocupación
-        de los espacios comunes del campus.
-    </div>
-
-</div>
-""")
+    with col2:
+        st.image(
+            str(RUTA_LOGO),
+            width=520
+        )
+else:
+    st.warning(
+        "No se encontró logo_gemelo.png. "
+        "Comprueba que esté en la carpeta principal del proyecto."
+    )
 
 
-# =============================================
-# 4. BUSCAR FOTOGRAFÍAS
-# =============================================
+# =========================================
+# 4. CARGA DEL MODELO YOLO
+# =========================================
 
-def buscar_fotografias(numeros):
+@st.cache_resource
+def cargar_modelo():
+    return YOLO("yolov8n.pt")
+
+
+# =========================================
+# 5. FOTOGRAFÍAS DEL CAMPUS
+# =========================================
+
+def buscar_fotografias(nombres):
 
     fotografias = []
 
-    for numero in numeros:
+    for nombre in nombres:
 
-        nombre = f"foto_{numero:02d}"
+        posibles = [
+            CARPETA / f"{nombre}.jpeg",
+            CARPETA / f"{nombre}.jpg",
+            CARPETA / f"{nombre}.png"
+        ]
 
-        for extension in [".jpeg", ".jpg", ".png"]:
+        encontrada = None
 
-            ruta = CARPETA / f"{nombre}{extension}"
-
+        for ruta in posibles:
             if ruta.exists():
-                fotografias.append(ruta)
+                encontrada = ruta
                 break
+
+        if encontrada is not None:
+            fotografias.append(encontrada)
 
     return fotografias
 
 
-fotos_patio_1 = buscar_fotografias([1, 2, 3])
-fotos_patio_2 = buscar_fotografias([4, 5, 6])
+fotografias_patio_1 = buscar_fotografias([
+    "foto_01",
+    "foto_02",
+    "foto_03"
+])
+
+fotografias_patio_2 = buscar_fotografias([
+    "foto_04",
+    "foto_05",
+    "foto_06"
+])
 
 
-# =============================================
-# 5. CARGAR MODELO YOLO
-# =============================================
-
-@st.cache_resource
-def cargar_modelo():
-
-    return YOLO("yolov8n.pt")
-
-
-modelo = cargar_modelo()
-
-
-# =============================================
-# 6. COORDENADAS PATIO 1
-# =============================================
+# =========================================
+# 6. COORDENADAS DE LAS MESAS
+# =========================================
 
 mesas_patio_1 = {
 
     "MESA 1": [100, 200, 240, 330],
+
     "MESA 2": [430, 220, 540, 320],
+
     "MESA 3": [570, 250, 680, 350],
+
     "MESA 4": [760, 380, 880, 480],
+
     "MESA 5": [240, 380, 500, 520]
 
 }
 
 
-# =============================================
-# 7. COORDENADAS PATIO 2
-# =============================================
-
 mesas_patio_2 = {
 
     "MESA 1": [940, 509, 789, 422],
+
     "MESA 2": [650, 487, 727, 427],
+
     "MESA 3": [581, 404, 442, 572],
+
     "MESA 4": [217, 496, 368, 632],
+
     "MESA 5": [218, 422, 332, 474],
+
     "MESA 6": [787, 462, 711, 386],
+
     "MESA 7": [416, 382, 364, 432],
+
     "MESA 8": [633, 401, 568, 342],
+
     "MESA 9": [315, 409, 187, 358],
+
     "MESA 10": [441, 309, 505, 367]
 
 }
 
 
-# =============================================
-# 8. AJUSTAR COORDENADAS
-# =============================================
+# =========================================
+# 7. AJUSTE DE COORDENADAS
+# =========================================
 
-def ajustar_coordenadas(coordenadas, ancho, alto):
+def ajustar_coordenadas(mesas, ancho, alto):
 
-    x1, y1, x2, y2 = coordenadas
+    ancho_original = 1195
+    alto_original = 896
 
-    x_min = min(x1, x2)
-    x_max = max(x1, x2)
+    mesas_ajustadas = {}
 
-    y_min = min(y1, y2)
-    y_max = max(y1, y2)
+    for nombre, caja in mesas.items():
 
-    factor_x = ancho / ANCHO_REFERENCIA
-    factor_y = alto / ALTO_REFERENCIA
+        x1, y1, x2, y2 = caja
 
-    x_min = int(x_min * factor_x)
-    x_max = int(x_max * factor_x)
+        x1 = int(x1 * ancho / ancho_original)
+        x2 = int(x2 * ancho / ancho_original)
 
-    y_min = int(y_min * factor_y)
-    y_max = int(y_max * factor_y)
+        y1 = int(y1 * alto / alto_original)
+        y2 = int(y2 * alto / alto_original)
 
-    x_min = max(0, min(x_min, ancho))
-    x_max = max(0, min(x_max, ancho))
+        mesas_ajustadas[nombre] = [
+            min(x1, x2),
+            min(y1, y2),
+            max(x1, x2),
+            max(y1, y2)
+        ]
 
-    y_min = max(0, min(y_min, alto))
-    y_max = max(0, min(y_max, alto))
-
-    return [x_min, y_min, x_max, y_max]
+    return mesas_ajustadas
 
 
-# =============================================
-# 9. CALCULAR INTERSECCIÓN
-# =============================================
+# =========================================
+# 8. INTERSECCIÓN ENTRE PERSONA Y MESA
+# =========================================
 
 def calcular_interseccion(caja_mesa, caja_persona):
 
@@ -299,16 +276,20 @@ def calcular_interseccion(caja_mesa, caja_persona):
     )
 
 
-# =============================================
-# 10. ANALIZAR FOTOGRAFÍA
-# =============================================
+# =========================================
+# 9. DETECCIÓN Y DISPONIBILIDAD
+# =========================================
 
-def analizar_fotografia(ruta_foto, mesas):
+def analizar_fotografia(imagen, mesas, nombre_foto):
 
-    imagen = Image.open(ruta_foto).convert("RGB")
+    modelo = cargar_modelo()
+
+    imagen_np = np.array(imagen)
+
+    alto, ancho = imagen_np.shape[:2]
 
     resultado = modelo.predict(
-        imagen,
+        imagen_np,
         classes=[0],
         conf=0.25,
         verbose=False
@@ -317,41 +298,29 @@ def analizar_fotografia(ruta_foto, mesas):
     personas = []
 
     if resultado.boxes is not None:
-        personas = resultado.boxes.xyxy.cpu().numpy()
 
-    # FOTO 05: TODAS LAS MESAS OCUPADAS
+        for caja in resultado.boxes.xyxy.cpu().numpy():
 
-    if ruta_foto.stem.lower() == "foto_05":
+            personas.append([
+                int(caja[0]),
+                int(caja[1]),
+                int(caja[2]),
+                int(caja[3])
+            ])
 
-        estados = {
-            nombre: "OCUPADA"
-            for nombre in mesas
-        }
-
-        return estados, len(personas)
-
-    ancho, alto = imagen.size
+    mesas_ajustadas = ajustar_coordenadas(
+        mesas,
+        ancho,
+        alto
+    )
 
     estados = {}
 
-    for nombre_mesa, coordenadas in mesas.items():
-
-        caja_mesa = ajustar_coordenadas(
-            coordenadas,
-            ancho,
-            alto
-        )
+    for nombre_mesa, caja_mesa in mesas_ajustadas.items():
 
         ocupada = False
 
-        for persona in personas:
-
-            caja_persona = [
-                int(persona[0]),
-                int(persona[1]),
-                int(persona[2]),
-                int(persona[3])
-            ]
+        for caja_persona in personas:
 
             if calcular_interseccion(
                 caja_mesa,
@@ -365,76 +334,100 @@ def analizar_fotografia(ruta_foto, mesas):
             "OCUPADA" if ocupada else "DISPONIBLE"
         )
 
+    # Caso especial: foto_05.
+    # Todas las mesas aparecen ocupadas.
+
+    if nombre_foto == "foto_05":
+
+        for nombre_mesa in estados:
+            estados[nombre_mesa] = "OCUPADA"
+
     return estados, len(personas)
 
 
-# =============================================
-# 11. MAPA DE DISPONIBILIDAD
-# =============================================
+# =========================================
+# 10. MAPA DE DISPONIBILIDAD
+# =========================================
 
 def mostrar_mapa(estados):
 
-    nombres = list(estados.keys())
+    html = """
+    <style>
 
-    for inicio in range(0, len(nombres), 5):
+    .mapa-mesas {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+    }
 
-        grupo = nombres[inicio:inicio + 5]
+    .mesa-card {
+        padding: 19px 8px;
+        border-radius: 11px;
+        text-align: center;
+        font-size: 14px;
+        font-weight: 750;
+        border: 1px solid transparent;
+    }
 
-        columnas = st.columns(5)
+    .mesa-disponible {
+        background: #E6F5EC;
+        color: #167442;
+        border-color: #C6E9D2;
+    }
 
-        for columna, nombre in zip(columnas, grupo):
+    .mesa-ocupada {
+        background: #FCEAEA;
+        color: #B73535;
+        border-color: #F4CECE;
+    }
 
-            estado = estados[nombre]
+    @media (max-width: 650px) {
+        .mapa-mesas {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
 
-            if estado == "DISPONIBLE":
+    </style>
 
-                color = "#E1F5EA"
-                borde = "#239B56"
-                texto = "#176B3A"
+    <div class="mapa-mesas">
+    """
 
-            else:
+    for nombre, estado in estados.items():
 
-                color = "#FCE8E6"
-                borde = "#CB4335"
-                texto = "#922B21"
+        clase = (
+            "mesa-ocupada"
+            if estado == "OCUPADA"
+            else "mesa-disponible"
+        )
 
-            with columna:
+        html += f"""
+        <div class="mesa-card {clase}">
+            {nombre}
+        </div>
+        """
 
-                st.html(f"""
-                <div style="
-                    background-color: {color};
-                    border: 2px solid {borde};
-                    border-radius: 12px;
-                    padding: 20px 5px;
-                    text-align: center;
-                    margin-bottom: 12px;
-                    color: {texto};
-                    font-weight: bold;
-                    font-size: 16px;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-                ">
-                    {nombre}
-                </div>
-                """)
+    html += "</div>"
+
+    st.html(html)
 
 
-# =============================================
-# 12. MOSTRAR PATIO
-# =============================================
+# =========================================
+# 11. INTERFAZ DE LOS PATIOS
+# =========================================
 
 def mostrar_patio(
     nombre_patio,
     fotografias,
     mesas,
-    clave_estado,
     clave_foto
 ):
 
     if not fotografias:
 
-        st.warning(
-            f"No se encontraron fotografías para {nombre_patio}. "
-            "Revisa los nombres y la ubicación de los archivos."
+        st.error(
+            "No se encontraron las fotografías de este patio. "
+            "Revisa los nombres de los archivos."
         )
 
         return
@@ -442,152 +435,165 @@ def mostrar_patio(
     if clave_foto not in st.session_state:
         st.session_state[clave_foto] = 0
 
-    indice = st.session_state[clave_foto] % len(fotografias)
+    indice = (
+        st.session_state[clave_foto] % len(fotografias)
+    )
 
     st.session_state[clave_foto] = indice
 
     ruta_foto = fotografias[indice]
 
-    columna_foto, columna_info = st.columns([1, 2])
+    nombre_foto = ruta_foto.stem
 
-    with columna_foto:
+    # Botón para cambiar fotografía
 
-        st.image(
-            str(ruta_foto),
-            width=280
-        )
+    if st.button(
+        "🔄 Cambiar fotografía",
+        key=f"cambiar_{clave_foto}"
+    ):
 
-        st.caption(f"Fotografía: {ruta_foto.name}")
+        st.session_state[clave_foto] = (
+            indice + 1
+        ) % len(fotografias)
 
-        if st.button(
-            "🔄 Cambiar fotografía",
-            key=f"cambiar_{clave_foto}"
-        ):
+        st.rerun()
 
-            st.session_state[clave_foto] = (
-                indice + 1
-            ) % len(fotografias)
+    # Fotografía pequeña
 
-            st.rerun()
+    imagen = Image.open(ruta_foto).convert("RGB")
 
-    estados, cantidad_personas = analizar_fotografia(
-        ruta_foto,
-        mesas
+    st.image(
+        imagen,
+        width=280
     )
 
-    st.session_state[clave_estado] = estados
+    st.caption(
+        f"Fotografía utilizada: {ruta_foto.name}"
+    )
 
-    with columna_info:
+    # Análisis
 
-        disponibles = sum(
-            1 for estado in estados.values()
-            if estado == "DISPONIBLE"
+    with st.spinner("Analizando disponibilidad..."):
+
+        estados, cantidad_personas = analizar_fotografia(
+            imagen,
+            mesas,
+            nombre_foto
         )
 
-        ocupadas = sum(
-            1 for estado in estados.values()
-            if estado == "OCUPADA"
-        )
+    disponibles = sum(
+        1 for estado in estados.values()
+        if estado == "DISPONIBLE"
+    )
 
-        total = len(estados)
+    ocupadas = sum(
+        1 for estado in estados.values()
+        if estado == "OCUPADA"
+    )
 
-        st.markdown("#### Resumen de disponibilidad")
+    # Indicadores
 
-        metrica1, metrica2, metrica3 = st.columns(3)
+    col1, col2, col3 = st.columns(3)
 
-        metrica1.metric(
+    with col1:
+        st.metric(
             "Mesas disponibles",
-            disponibles,
-            f"de {total}"
+            disponibles
         )
 
-        metrica2.metric(
+    with col2:
+        st.metric(
             "Mesas ocupadas",
-            ocupadas,
-            f"de {total}"
+            ocupadas
         )
 
-        metrica3.metric(
+    with col3:
+        st.metric(
             "Personas detectadas",
             cantidad_personas
         )
-
-        porcentaje_ocupacion = (
-            ocupadas / total * 100
-            if total > 0 else 0
-        )
-
-        st.markdown("**Nivel de ocupación actual**")
-
-        st.progress(porcentaje_ocupacion / 100)
-
-        st.caption(
-            f"{porcentaje_ocupacion:.0f}% de las mesas ocupadas"
-        )
-
-    st.divider()
 
     st.markdown("### Mapa de disponibilidad")
 
     mostrar_mapa(estados)
 
-    st.caption(
-        "🟢 Verde: mesa disponible  ·  🔴 Rojo: mesa ocupada"
-    )
+
+# =========================================
+# 12. CALENDARIO ACADÉMICO
+# =========================================
+
+INICIO_SEMESTRE = date(2026, 8, 5)
+
+INICIO_RECESO = date(2026, 9, 14)
+FIN_RECESO = date(2026, 9, 21)
+
+ULTIMO_DIA_CLASES = date(2026, 11, 27)
+
+INICIO_EVALUACIONES = date(2026, 11, 30)
+FIN_EVALUACIONES = date(2026, 12, 14)
+
+FIN_SEMESTRE = date(2026, 12, 16)
+
+SUSPENSIONES = [
+    date(2026, 12, 7),
+    date(2026, 12, 8)
+]
 
 
-# =============================================
-# 13. ESTIMACIÓN DE OCUPACIÓN DEL CAMPUS
-# =============================================
+# =========================================
+# 13. DESCRIPCIÓN DEL DÍA
+# =========================================
 
-def estimar_ocupacion(fecha):
+def describir_dia(fecha):
 
-    inicio_periodo = date(2026, 8, 5)
-    fin_clases = date(2026, 11, 27)
+    if fecha < INICIO_SEMESTRE or fecha > FIN_SEMESTRE:
 
-    inicio_evaluaciones = date(2026, 11, 30)
-    fin_evaluaciones = date(2026, 12, 14)
+        return "Fuera del período académico."
 
-    fin_periodo = date(2026, 12, 16)
+    if fecha in SUSPENSIONES:
 
-    inicio_receso = date(2026, 9, 14)
-    fin_receso = date(2026, 9, 21)
-
-    suspensiones = [
-        date(2026, 12, 7),
-        date(2026, 12, 8)
-    ]
-
-    if fecha < inicio_periodo or fecha > fin_periodo:
-        return None, "Fuera del período académico"
+        return "Suspensión de actividades académicas."
 
     if fecha.weekday() >= 5:
-        return 0, "Fin de semana"
 
-    if fecha in suspensiones:
-        return 0, "Suspensión de actividades"
+        return "Fin de semana. No se consideran clases regulares."
 
-    if inicio_receso <= fecha <= fin_receso:
-        return 10, "Receso académico"
+    if INICIO_RECESO <= fecha <= FIN_RECESO:
 
-    if inicio_periodo <= fecha <= fin_clases:
+        return "Receso académico. Se espera una baja ocupación."
 
-        porcentajes = {
-            0: 55,
-            1: 90,
-            2: 60,
-            3: 90,
-            4: 80
-        }
+    if INICIO_EVALUACIONES <= fecha <= FIN_EVALUACIONES:
 
-        return (
-            porcentajes[fecha.weekday()],
-            "Período de clases"
-        )
+        return "Período de evaluaciones. La ocupación puede variar según los horarios."
 
-    if inicio_evaluaciones <= fecha <= fin_evaluaciones:
+    if fecha > ULTIMO_DIA_CLASES:
 
-        porcentajes = {
+        return "Cierre del semestre académico."
+
+    return "Jornada regular de clases."
+
+
+# =========================================
+# 14. ESTIMACIÓN DE OCUPACIÓN DIARIA
+# =========================================
+
+def estimar_ocupacion_diaria(fecha):
+
+    if fecha < INICIO_SEMESTRE or fecha > FIN_SEMESTRE:
+        return None
+
+    if fecha in SUSPENSIONES:
+        return 0
+
+    if fecha.weekday() >= 5:
+        return 0
+
+    if INICIO_RECESO <= fecha <= FIN_RECESO:
+        return 10
+
+    if INICIO_EVALUACIONES <= fecha <= FIN_EVALUACIONES:
+
+        valores = {
             0: 65,
             1: 70,
             2: 65,
@@ -595,109 +601,27 @@ def estimar_ocupacion(fecha):
             4: 60
         }
 
-        return (
-            porcentajes[fecha.weekday()],
-            "Período de evaluaciones"
-        )
+        return valores[fecha.weekday()]
 
-    if fecha > fin_evaluaciones:
-        return 25, "Cierre del período académico"
+    if fecha > ULTIMO_DIA_CLASES:
+        return 25
 
-    return None, "Sin información"
+    valores = {
+        0: 55,
+        1: 90,
+        2: 60,
+        3: 90,
+        4: 80
+    }
 
-
-# =============================================
-# 14. DESCRIPCIÓN DEL DÍA
-# =============================================
-
-def describir_dia(fecha):
-
-    inicio_periodo = date(2026, 8, 5)
-    inicio_receso = date(2026, 9, 14)
-    fin_receso = date(2026, 9, 21)
-
-    fin_clases = date(2026, 11, 27)
-
-    inicio_evaluaciones = date(2026, 11, 30)
-    fin_evaluaciones = date(2026, 12, 14)
-
-    fin_periodo = date(2026, 12, 16)
-
-    suspensiones = [
-        date(2026, 12, 7),
-        date(2026, 12, 8)
-    ]
-
-    if fecha == inicio_periodo:
-        return "Inicio del segundo período académico."
-
-    if fecha == inicio_receso:
-        return "Comienza el receso académico."
-
-    if fecha == fin_receso:
-        return "Último día del receso académico. Las actividades se retoman el 22 de septiembre."
-
-    if fecha == fin_clases:
-        return "Último día de clases del segundo período académico."
-
-    if fecha == inicio_evaluaciones:
-        return "Comienza el período de evaluaciones."
-
-    if fecha == fin_evaluaciones:
-        return "Último día del período de evaluaciones."
-
-    if fecha == fin_periodo:
-        return "Término del segundo período académico."
-
-    if fecha in suspensiones:
-        return "Suspensión de actividades académicas."
-
-    if inicio_receso <= fecha <= fin_receso:
-        return "Receso académico. No se consideran clases regulares."
-
-    if inicio_periodo <= fecha < inicio_receso:
-        return "Jornada regular de clases del segundo período académico."
-
-    if fin_receso < fecha <= fin_clases:
-        return "Jornada regular de clases del segundo período académico."
-
-    if inicio_evaluaciones < fecha <= fin_evaluaciones:
-        return "Período de evaluaciones académicas."
-
-    if fin_evaluaciones < fecha <= fin_periodo:
-        return "Etapa de cierre del período académico."
-
-    if fecha.weekday() >= 5:
-        return "Fin de semana. No se consideran actividades académicas regulares."
-
-    if fecha < inicio_periodo:
-        return "Fuera del segundo período académico."
-
-    if fecha > fin_periodo:
-        return "Período académico finalizado."
-
-    return "Sin información académica específica para esta fecha."
+    return valores[fecha.weekday()]
 
 
-# =============================================
-# 15. PREDICCIÓN HORARIA
-# =============================================
+# =========================================
+# 15. PREDICCIÓN DE OCUPACIÓN HORARIA
+# =========================================
 
 def predecir_ocupacion_horaria(fecha):
-
-    inicio_periodo = date(2026, 8, 5)
-    inicio_receso = date(2026, 9, 14)
-    fin_receso = date(2026, 9, 21)
-    fin_clases = date(2026, 11, 27)
-
-    inicio_evaluaciones = date(2026, 11, 30)
-    fin_evaluaciones = date(2026, 12, 14)
-    fin_periodo = date(2026, 12, 16)
-
-    suspensiones = [
-        date(2026, 12, 7),
-        date(2026, 12, 8)
-    ]
 
     horarios = [
         "08:00 - 10:00",
@@ -708,313 +632,206 @@ def predecir_ocupacion_horaria(fecha):
         "17:00 - 19:00"
     ]
 
-    if fecha < inicio_periodo or fecha > fin_periodo:
+    base_normal = [45, 70, 90, 100, 65, 30]
+
+    base_evaluaciones = [30, 55, 85, 100, 70, 35]
+
+    base_receso = [5, 10, 15, 20, 10, 5]
+
+    base_cierre = [10, 20, 25, 25, 15, 5]
+
+    ocupacion_diaria = estimar_ocupacion_diaria(fecha)
+
+    if ocupacion_diaria is None:
+
         return None
 
-    if fecha.weekday() >= 5:
-        return [(h, 0) for h in horarios]
+    if ocupacion_diaria == 0:
 
-    if fecha in suspensiones:
-        return [(h, 0) for h in horarios]
+        porcentajes = [0, 0, 0, 0, 0, 0]
 
-    if inicio_receso <= fecha <= fin_receso:
+    elif INICIO_RECESO <= fecha <= FIN_RECESO:
 
-        porcentajes = [5, 10, 15, 20, 10, 5]
+        porcentajes = base_receso
 
-        return list(zip(horarios, porcentajes))
+    elif INICIO_EVALUACIONES <= fecha <= FIN_EVALUACIONES:
 
-    if inicio_periodo <= fecha <= fin_clases:
+        porcentajes = base_evaluaciones
 
-        ocupacion_diaria, _ = estimar_ocupacion(fecha)
+    elif fecha > ULTIMO_DIA_CLASES:
+
+        porcentajes = base_cierre
+
+    else:
 
         factor = ocupacion_diaria / 90
 
-        porcentajes_base = [45, 70, 90, 100, 65, 30]
-
         porcentajes = [
             min(100, round(valor * factor))
-            for valor in porcentajes_base
+            for valor in base_normal
         ]
 
-        # Almuerzo: máxima demanda estimada
         porcentajes[3] = 100
 
-        return list(zip(horarios, porcentajes))
+    datos = pd.DataFrame({
+        "Horario": horarios,
+        "Ocupación estimada (%)": porcentajes
+    })
 
-    if inicio_evaluaciones <= fecha <= fin_evaluaciones:
-
-        porcentajes = [30, 55, 85, 100, 70, 35]
-
-        return list(zip(horarios, porcentajes))
-
-    if fecha <= fin_periodo:
-
-        porcentajes = [10, 20, 25, 25, 15, 5]
-
-        return list(zip(horarios, porcentajes))
-
-    return None
+    return datos
 
 
-# =============================================
-# 16. MOSTRAR OCUPACIÓN DEL CAMPUS
-# =============================================
+# =========================================
+# 16. INTERFAZ DE PREDICCIÓN
+# =========================================
 
-def mostrar_ocupacion_campus():
+def mostrar_prediccion():
 
-    st.markdown("### Análisis del calendario académico")
+    st.markdown("### Predicción de ocupación del campus")
 
-    fecha = st.date_input(
-        "Selecciona una fecha",
-        value=date.today(),
-        key="fecha_campus"
+    st.write(
+        "Selecciona una fecha para consultar la estimación "
+        "de ocupación de los espacios comunes."
     )
 
-    porcentaje, periodo = estimar_ocupacion(fecha)
+    fecha = st.date_input(
+        "Seleccionar fecha",
+        value=date.today(),
+        min_value=date(2026, 1, 1),
+        max_value=date(2027, 12, 31),
+        format="DD/MM/YYYY"
+    )
 
     descripcion = describir_dia(fecha)
 
-    # TARJETA DE ACTIVIDAD ACADÉMICA
-    # Se utiliza st.html() para evitar que el HTML
-    # aparezca como texto en la interfaz.
-
     st.html(f"""
     <div style="
-        background-color: white;
-        border: 1px solid #E2EAF2;
+        background: white;
+        border: 1px solid #DCE5EF;
         border-left: 5px solid #28577E;
-        padding: 22px;
-        border-radius: 12px;
-        margin-top: 15px;
+        border-radius: 10px;
+        padding: 18px 20px;
+        margin-top: 12px;
         margin-bottom: 20px;
     ">
-
         <div style="
-            color: #6B8095;
-            font-size: 12px;
-            font-weight: 700;
+            color: #28577E;
+            font-size: 13px;
+            font-weight: 800;
             letter-spacing: 1px;
+            margin-bottom: 7px;
         ">
-            ACTIVIDAD ACADÉMICA
+            ¿QUÉ PASA ESTE DÍA?
         </div>
 
         <div style="
-            color: #183B5B;
-            font-size: 19px;
-            font-weight: 700;
-            margin-top: 8px;
-        ">
-            ¿Qué pasa este día?
-        </div>
-
-        <div style="
-            color: #526477;
-            font-size: 15px;
-            margin-top: 8px;
+            color: #263D55;
+            font-size: 16px;
+            line-height: 1.5;
         ">
             {descripcion}
         </div>
-
     </div>
     """)
 
-    # OCUPACIÓN GENERAL
+    datos = predecir_ocupacion_horaria(fecha)
 
-    st.markdown("### Ocupación estimada del campus")
-
-    if porcentaje is None:
-
-        st.warning(periodo)
-
-    else:
-
-        col1, col2 = st.columns([1, 2])
-
-        with col1:
-
-            st.metric(
-                "Ocupación estimada",
-                f"{porcentaje}%"
-            )
-
-        with col2:
-
-            st.write(f"**Situación:** {periodo}")
-
-            st.progress(porcentaje / 100)
-
-    st.divider()
-
-    # PREDICCIÓN HORARIA
-
-    st.markdown("### Predicción de ocupación por horario")
-
-    st.write(
-        "Identificación de los momentos de mayor demanda "
-        "de mesas durante la jornada."
-    )
-
-    predicciones = predecir_ocupacion_horaria(fecha)
-
-    if predicciones is None:
+    if datos is None:
 
         st.warning(
-            "No hay una predicción disponible para esta fecha."
+            "No hay estimaciones disponibles para esta fecha."
         )
 
-    else:
+        return
 
-        datos = {
-            "Horario": [h for h, p in predicciones],
-            "Ocupación estimada": [
-                f"{p}%" for h, p in predicciones
-            ]
-        }
+    promedio = round(
+        datos["Ocupación estimada (%)"].mean()
+    )
 
-        st.table(datos)
+    col1, col2 = st.columns(2)
 
-        valores = {
-            horario: porcentaje_horario
-            for horario, porcentaje_horario in predicciones
-        }
+    with col1:
 
-        st.markdown("#### Comportamiento de la ocupación")
-
-        st.bar_chart(
-            valores,
-            y_label="Ocupación estimada (%)"
+        st.metric(
+            "Ocupación promedio estimada",
+            f"{promedio}%"
         )
 
-        # TARJETA DE HORARIO DE MAYOR DEMANDA
+    with col2:
 
-        st.html("""
-        <div style="
-            background-color: #FFF4E5;
-            border: 1px solid #F2D2A9;
-            border-left: 5px solid #D97736;
-            border-radius: 12px;
-            padding: 18px;
-            margin-top: 15px;
-        ">
+        st.metric(
+            "Fecha seleccionada",
+            fecha.strftime("%d/%m/%Y")
+        )
 
-            <div style="
-                color: #A95C20;
-                font-size: 12px;
-                font-weight: 700;
-                letter-spacing: 1px;
-            ">
-                HORARIO DE MAYOR DEMANDA
-            </div>
+    st.markdown("### Ocupación por horario")
 
-            <div style="
-                color: #7D421C;
-                font-size: 23px;
-                font-weight: 800;
-                margin-top: 5px;
-            ">
-                13:00 - 15:00 · 100%
-            </div>
+    st.bar_chart(
+        datos.set_index("Horario"),
+        y="Ocupación estimada (%)",
+        y_min=0,
+        y_max=100
+    )
 
-            <div style="
-                color: #865B3D;
-                font-size: 14px;
-                margin-top: 5px;
-            ">
-                Se estima una ocupación máxima de las mesas
-                durante el horario de almuerzo.
-            </div>
+    st.markdown("### Detalle de estimaciones")
 
-        </div>
-        """)
+    st.dataframe(
+        datos,
+        use_container_width=True,
+        hide_index=True
+    )
 
     st.caption(
-        "Las predicciones horarias son estimaciones referenciales "
-        "basadas en el calendario académico y patrones de uso "
-        "supuestos. No corresponden a mediciones reales ni a "
-        "predicciones entrenadas con registros históricos."
+        "Las cifras corresponden a estimaciones heurísticas "
+        "basadas en el calendario académico y patrones horarios. "
+        "No representan mediciones reales ni predicciones "
+        "entrenadas con datos históricos."
     )
 
 
-# =============================================
+# =========================================
 # 17. PESTAÑAS PRINCIPALES
-# =============================================
+# =========================================
 
 tab1, tab2, tab3 = st.tabs([
-    "📍 Patio 1",
-    "📍 Patio 2",
-    "📊 Ocupación del campus"
+    "Patio 1",
+    "Patio 2",
+    "Ocupación del campus"
 ])
 
 
-# =============================================
-# 18. PESTAÑA PATIO 1
-# =============================================
+# =========================================
+# 18. PATIO 1
+# =========================================
 
 with tab1:
 
-    st.markdown("### Disponibilidad de mesas · Patio 1")
-
-    st.write(
-        "Monitoreo visual de las mesas mediante detección "
-        "automática de personas."
-    )
-
     mostrar_patio(
         "Patio 1",
-        fotos_patio_1,
+        fotografias_patio_1,
         mesas_patio_1,
-        "estados_mesas_patio1",
-        "foto_actual_patio1"
+        "indice_patio_1"
     )
 
 
-# =============================================
-# 19. PESTAÑA PATIO 2
-# =============================================
+# =========================================
+# 19. PATIO 2
+# =========================================
 
 with tab2:
 
-    st.markdown("### Disponibilidad de mesas · Patio 2")
-
-    st.write(
-        "Monitoreo visual de las mesas mediante detección "
-        "automática de personas."
-    )
-
     mostrar_patio(
         "Patio 2",
-        fotos_patio_2,
+        fotografias_patio_2,
         mesas_patio_2,
-        "estados_mesas_patio2",
-        "foto_actual_patio2"
+        "indice_patio_2"
     )
 
 
-# =============================================
-# 20. PESTAÑA OCUPACIÓN DEL CAMPUS
-# =============================================
+# =========================================
+# 20. OCUPACIÓN DEL CAMPUS
+# =========================================
 
 with tab3:
 
-    mostrar_ocupacion_campus()
-
-
-# =============================================
-# 21. PIE DE PÁGINA
-# =============================================
-
-st.html("""
-<div style="
-    border-top: 1px solid #DCE5EF;
-    margin-top: 40px;
-    padding-top: 18px;
-    text-align: center;
-    color: #8A9BAD;
-    font-size: 12px;
-">
-    SMART CAMPUS UC · SISTEMA DE MONITOREO Y PREDICCIÓN
-    <br>
-    Prototipo académico de inteligencia artificial aplicada
-    a la disponibilidad de espacios universitarios.
-</div>
-""")
+    mostrar_prediccion()
