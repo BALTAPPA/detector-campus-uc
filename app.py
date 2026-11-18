@@ -1,6 +1,8 @@
 
 import streamlit as st
 import numpy as np
+import random
+from pathlib import Path
 from PIL import Image
 from ultralytics import YOLO
 from datetime import date, timedelta
@@ -52,7 +54,7 @@ def cargar_modelo():
 
 
 # =====================================
-# 4. PESTAÑAS PRINCIPALES
+# 4. CREAR PESTAÑAS
 # =====================================
 
 pestana1, pestana2 = st.tabs([
@@ -62,7 +64,7 @@ pestana1, pestana2 = st.tabs([
 
 
 # ==========================================================
-# PESTAÑA 1: DISPONIBILIDAD ACTUAL DE LAS MESAS
+# PESTAÑA 1: DISPONIBILIDAD ACTUAL
 # ==========================================================
 
 with pestana1:
@@ -70,30 +72,80 @@ with pestana1:
     st.header("Disponibilidad actual")
 
     st.write(
-        "Sube una fotografía del campus para detectar personas "
-        "y estimar qué mesas se encuentran disponibles."
+        "El sistema selecciona una fotografía de la base de datos "
+        "del campus y analiza la disponibilidad de las mesas."
     )
 
-    archivo = st.file_uploader(
-        "Sube una fotografía del campus",
-        type=["jpg", "jpeg", "png"],
-        key="foto_campus"
-    )
+    # =================================
+    # 5. BUSCAR FOTOGRAFIAS
+    # =================================
 
-    if archivo is not None:
+    CARPETA = Path(__file__).resolve().parent
 
-        imagen = Image.open(archivo).convert("RGB")
+    FOTOGRAFIAS = [
+        foto for foto in CARPETA.iterdir()
+        if foto.is_file()
+        and foto.suffix.lower() in [".jpg", ".jpeg", ".png"]
+    ]
+
+    FOTOGRAFIAS = sorted(FOTOGRAFIAS)
+
+    # =================================
+    # 6. SELECCIONAR FOTOGRAFIA
+    # =================================
+
+    if "foto_seleccionada" not in st.session_state:
+
+        if FOTOGRAFIAS:
+            st.session_state.foto_seleccionada = str(
+                random.choice(FOTOGRAFIAS)
+            )
+        else:
+            st.session_state.foto_seleccionada = None
+
+    if FOTOGRAFIAS:
+
+        # Botón para cambiar fotografía
+        if st.button("🔄 Cambiar fotografía"):
+
+            fotos_disponibles = [
+                str(foto) for foto in FOTOGRAFIAS
+                if str(foto) != st.session_state.foto_seleccionada
+            ]
+
+            if fotos_disponibles:
+
+                st.session_state.foto_seleccionada = str(
+                    random.choice(fotos_disponibles)
+                )
+
+        # Mostrar nombre de la fotografía
+        st.caption(
+            "Fotografía seleccionada: "
+            + Path(st.session_state.foto_seleccionada).name
+        )
+
+        # Abrir fotografía
+        imagen = Image.open(
+            st.session_state.foto_seleccionada
+        ).convert("RGB")
 
         ancho, alto = imagen.size
 
-        st.success("Fotografía cargada correctamente.")
+        st.image(
+            imagen,
+            caption="Fotografía seleccionada del campus",
+            use_container_width=True
+        )
 
-        # Cargar modelo
+        # =================================
+        # 7. CARGAR MODELO Y DETECTAR PERSONAS
+        # =================================
+
         with st.spinner("Cargando inteligencia artificial..."):
 
             modelo = cargar_modelo()
 
-        # Detectar personas
         with st.spinner("Detectando personas..."):
 
             resultados = modelo.predict(
@@ -108,12 +160,15 @@ with pestana1:
         for box in resultados.boxes:
 
             coordenadas = box.xyxy[0].cpu().numpy()
+
             personas.append(coordenadas.tolist())
 
-        st.write(f"Personas detectadas: **{len(personas)}**")
+        st.write(
+            f"Personas detectadas: **{len(personas)}**"
+        )
 
         # =================================
-        # 5. CONFIGURAR LAS 5 MESAS
+        # 8. CONFIGURAR LAS 5 MESAS
         # =================================
 
         st.divider()
@@ -173,10 +228,12 @@ with pestana1:
                         key=f"y_{i}"
                     )
 
-                    mesas[nombre] = [x1, y1, x2, y2]
+                    mesas[nombre] = [
+                        x1, y1, x2, y2
+                    ]
 
         # =================================
-        # 6. ANALIZAR DISPONIBILIDAD
+        # 9. ANALIZAR DISPONIBILIDAD
         # =================================
 
         if st.button(
@@ -196,6 +253,7 @@ with pestana1:
                         coordenadas,
                         persona
                     ):
+
                         ocupada = True
                         break
 
@@ -203,7 +261,10 @@ with pestana1:
                     "OCUPADA" if ocupada else "DISPONIBLE"
                 )
 
-            # Estadísticas
+            # =================================
+            # 10. ESTADISTICAS
+            # =================================
+
             ocupadas = sum(
                 estado == "OCUPADA"
                 for estado in estados.values()
@@ -212,7 +273,7 @@ with pestana1:
             disponibles = 5 - ocupadas
 
             # =================================
-            # 7. MAPA ESQUEMATICO
+            # 11. MAPA ESQUEMATICO
             # =================================
 
             st.divider()
@@ -273,6 +334,7 @@ with pestana1:
             </style>
             """, unsafe_allow_html=True)
 
+            # Distribución de las mesas
             filas = [
                 ["Mesa 1", "Mesa 2", "Mesa 3"],
                 ["Mesa 4", "Mesa 5"]
@@ -292,9 +354,12 @@ with pestana1:
                             estado = estados[nombre]
 
                             if estado == "DISPONIBLE":
+
                                 clase = "disponible"
                                 simbolo = "✓"
+
                             else:
+
                                 clase = "ocupada"
                                 simbolo = "✕"
 
@@ -331,7 +396,7 @@ with pestana1:
             """, unsafe_allow_html=True)
 
             # =================================
-            # 8. ESTADISTICAS
+            # 12. MOSTRAR ESTADISTICAS
             # =================================
 
             st.divider()
@@ -351,11 +416,15 @@ with pestana1:
 
     else:
 
-        st.info("Sube una fotografía para comenzar.")
+        st.error(
+            "No se encontraron fotografías. "
+            "Agrega imágenes JPG, JPEG o PNG al repositorio "
+            "junto a app.py."
+        )
 
 
 # ==========================================================
-# PESTAÑA 2: PREDICCION DE OCUPACION GENERAL DEL CAMPUS
+# PESTAÑA 2: PREDICCION DEL CAMPUS
 # ==========================================================
 
 with pestana2:
@@ -375,7 +444,7 @@ with pestana2:
     )
 
     # =================================
-    # 9. CALENDARIO ACADEMICO
+    # 13. CALENDARIO ACADEMICO 2026
     # =================================
 
     INICIO_CLASES = date(2026, 8, 5)
@@ -393,7 +462,7 @@ with pestana2:
     FERIADO = date(2026, 12, 8)
 
     # =================================
-    # 10. FUNCION DE PREDICCION
+    # 14. FUNCION DE PREDICCION
     # =================================
 
     def predecir_ocupacion(fecha):
@@ -402,10 +471,13 @@ with pestana2:
 
         # Fin de semana
         if dia >= 5:
-            return None, "Fin de semana", "No se estima actividad regular."
+            return None, "Fin de semana", (
+                "No se estima actividad académica regular."
+            )
 
         # Fechas fuera del segundo periodo
         if fecha < INICIO_CLASES or fecha > FIN_PERIODO:
+
             return None, "Sin datos del periodo", (
                 "La fecha está fuera del segundo periodo académico "
                 "considerado en este modelo."
@@ -413,23 +485,26 @@ with pestana2:
 
         # Receso académico
         if INICIO_RECESO <= fecha <= FIN_RECESO:
+
             return 10, "Receso académico", (
                 "Disminución importante de la actividad universitaria."
             )
 
         # Suspensión de actividades
         if fecha == SUSPENSION:
+
             return 0, "Suspensión de actividades", (
                 "Suspensión de actividades académicas y administrativas."
             )
 
         # Feriado
         if fecha == FERIADO:
+
             return 0, "Feriado", (
-                "Feriado: se espera una actividad universitaria muy baja."
+                "Se espera una actividad universitaria muy baja."
             )
 
-        # Periodo de evaluaciones finales
+        # Periodo de evaluaciones
         if INICIO_EVALUACIONES <= fecha <= FIN_EVALUACIONES:
 
             valores_evaluacion = {
@@ -447,8 +522,9 @@ with pestana2:
                 "La actividad puede variar según cada carrera."
             )
 
-        # Últimos días del periodo académico
+        # Cierre del periodo
         if fecha > FIN_EVALUACIONES:
+
             return 25, "Cierre del periodo académico", (
                 "Actividad académica reducida después del periodo "
                 "de evaluaciones."
@@ -459,14 +535,12 @@ with pestana2:
         # =================================
 
         valores_semanales = {
-            0: 55,  # Lunes
-            1: 90,  # Martes
-            2: 60,  # Miércoles
-            3: 90,  # Jueves
-            4: 80   # Viernes
+            0: 55,
+            1: 90,
+            2: 60,
+            3: 90,
+            4: 80
         }
-
-        valor = valores_semanales[dia]
 
         actividades = {
             0: (
@@ -491,23 +565,27 @@ with pestana2:
             )
         }
 
-        return valor, "Periodo normal de clases", actividades[dia]
+        return (
+            valores_semanales[dia],
+            "Periodo normal de clases",
+            actividades[dia]
+        )
 
     # =================================
-    # 11. SELECCIONAR SEMANA
+    # 15. SELECCIONAR SEMANA
     # =================================
 
     st.divider()
     st.subheader("Consultar actividad semanal")
 
     fecha_seleccionada = st.date_input(
-        "Selecciona cualquier día de la semana que quieres consultar",
+        "Selecciona un día de la semana que quieres consultar",
         value=date.today(),
         min_value=date(2026, 1, 1),
         max_value=date(2027, 12, 31)
     )
 
-    # Encontrar lunes de esa semana
+    # Encontrar lunes de la semana
     lunes = fecha_seleccionada - timedelta(
         days=fecha_seleccionada.weekday()
     )
@@ -527,7 +605,7 @@ with pestana2:
     )
 
     # =================================
-    # 12. MOSTRAR PREDICCION POR DIA
+    # 16. PREDICCION POR DIA
     # =================================
 
     predicciones = []
@@ -556,11 +634,7 @@ with pestana2:
 
             if porcentaje is None:
 
-                st.metric(
-                    "Estimación",
-                    "N/D"
-                )
-
+                st.metric("Estimación", "N/D")
                 st.caption(etapa)
 
             else:
@@ -585,7 +659,7 @@ with pestana2:
                     st.success("Actividad baja")
 
     # =================================
-    # 13. EXPLICACION DE CADA DIA
+    # 17. DETALLE DE LA SEMANA
     # =================================
 
     st.divider()
@@ -598,7 +672,9 @@ with pestana2:
             f"{prediccion['fecha'].strftime('%d/%m/%Y')}"
         ):
 
-            st.write(f"**Periodo:** {prediccion['etapa']}")
+            st.write(
+                f"**Periodo:** {prediccion['etapa']}"
+            )
 
             st.write(prediccion["explicacion"])
 
@@ -610,7 +686,7 @@ with pestana2:
                 )
 
     # =================================
-    # 14. RESUMEN DE LA SEMANA
+    # 18. RESUMEN SEMANAL
     # =================================
 
     st.divider()
@@ -664,7 +740,7 @@ with pestana2:
         )
 
     # =================================
-    # 15. CRITERIOS DEL MODELO
+    # 19. EXPLICACION DEL MODELO
     # =================================
 
     st.divider()
@@ -694,5 +770,5 @@ with pestana2:
 
         Los valores son ponderaciones iniciales definidas
         para construir una primera aproximación del modelo.
-        No son porcentajes obtenidos de cámaras ni de sensores.
+        No son porcentajes obtenidos de cámaras ni sensores.
         """)
