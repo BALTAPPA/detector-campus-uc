@@ -5,7 +5,7 @@ import pandas as pd
 from PIL import Image
 from ultralytics import YOLO
 from pathlib import Path
-from datetime import date, datetime, time
+from datetime import date
 
 # =========================================
 # 1. CONFIGURACIÓN DE LA PÁGINA
@@ -18,6 +18,7 @@ st.set_page_config(
 )
 
 CARPETA = Path(__file__).parent
+
 
 # =========================================
 # 2. ESTILOS DE LA INTERFAZ
@@ -119,6 +120,7 @@ div[data-testid="stImage"] img {
 RUTA_LOGO = CARPETA / "logo_gemelo.png"
 
 if RUTA_LOGO.exists():
+
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
@@ -126,7 +128,9 @@ if RUTA_LOGO.exists():
             str(RUTA_LOGO),
             width=520
         )
+
 else:
+
     st.warning(
         "No se encontró logo_gemelo.png. "
         "Comprueba que esté en la carpeta principal del proyecto."
@@ -161,6 +165,7 @@ def buscar_fotografias(nombres):
         encontrada = None
 
         for ruta in posibles:
+
             if ruta.exists():
                 encontrada = ruta
                 break
@@ -191,13 +196,9 @@ fotografias_patio_2 = buscar_fotografias([
 mesas_patio_1 = {
 
     "MESA 1": [100, 200, 240, 330],
-
     "MESA 2": [430, 220, 540, 320],
-
     "MESA 3": [570, 250, 680, 350],
-
     "MESA 4": [760, 380, 880, 480],
-
     "MESA 5": [240, 380, 500, 520]
 
 }
@@ -206,23 +207,14 @@ mesas_patio_1 = {
 mesas_patio_2 = {
 
     "MESA 1": [940, 509, 789, 422],
-
     "MESA 2": [650, 487, 727, 427],
-
     "MESA 3": [581, 404, 442, 572],
-
     "MESA 4": [217, 496, 368, 632],
-
     "MESA 5": [218, 422, 332, 474],
-
     "MESA 6": [787, 462, 711, 386],
-
     "MESA 7": [416, 382, 364, 432],
-
     "MESA 8": [633, 401, 568, 342],
-
     "MESA 9": [315, 409, 187, 358],
-
     "MESA 10": [441, 309, 505, 367]
 
 }
@@ -496,18 +488,21 @@ def mostrar_patio(
     col1, col2, col3 = st.columns(3)
 
     with col1:
+
         st.metric(
             "Mesas disponibles",
             disponibles
         )
 
     with col2:
+
         st.metric(
             "Mesas ocupadas",
             ocupadas
         )
 
     with col3:
+
         st.metric(
             "Personas detectadas",
             cantidad_personas
@@ -766,11 +761,13 @@ def mostrar_prediccion():
 
     st.markdown("### Ocupación por horario")
 
+    # GRÁFICO CORREGIDO
+
+    grafico = datos.set_index("Horario")
+
     st.bar_chart(
-        datos.set_index("Horario"),
-        y="Ocupación estimada (%)",
-        y_min=0,
-        y_max=100
+        grafico,
+        y="Ocupación estimada (%)"
     )
 
     st.markdown("### Detalle de estimaciones")
