@@ -5,21 +5,14 @@ from ultralytics import YOLO
 from pathlib import Path
 from datetime import date
 
-# =====================================
+# =============================================
 # 1. CONFIGURACIÓN DE LA PÁGINA
-# =====================================
+# =============================================
 
 st.set_page_config(
-    page_title="Detector Campus UC",
+    page_title="Smart Campus UC",
     page_icon="🏫",
     layout="wide"
-)
-
-st.title("🏫 Detector de disponibilidad - Campus UC")
-
-st.write(
-    "Sistema de inteligencia artificial para detectar "
-    "la ocupación de mesas en el campus."
 )
 
 CARPETA = Path(__file__).parent
@@ -28,9 +21,179 @@ ANCHO_REFERENCIA = 1195
 ALTO_REFERENCIA = 896
 
 
-# =====================================
-# 2. BUSCAR FOTOGRAFÍAS
-# =====================================
+# =============================================
+# 2. DISEÑO VISUAL
+# =============================================
+
+st.markdown("""
+<style>
+
+/* Fondo general */
+.stApp {
+    background-color: #F4F7FB;
+}
+
+/* Ocultar elementos de Streamlit */
+#MainMenu {
+    visibility: hidden;
+}
+
+footer {
+    visibility: hidden;
+}
+
+/* Contenedor principal */
+.block-container {
+    padding-top: 2rem;
+    padding-bottom: 3rem;
+    max-width: 1450px;
+}
+
+/* Títulos */
+h1, h2, h3 {
+    color: #183B5B !important;
+    font-weight: 750 !important;
+}
+
+/* Texto */
+p, label {
+    color: #526477;
+}
+
+/* Pestañas */
+.stTabs [data-baseweb="tab-list"] {
+    gap: 12px;
+    border-bottom: 1px solid #DCE5EF;
+}
+
+.stTabs [data-baseweb="tab"] {
+    background-color: #E8EEF5;
+    border-radius: 10px 10px 0 0;
+    padding: 12px 22px;
+    color: #38536F;
+    font-weight: 600;
+}
+
+.stTabs [aria-selected="true"] {
+    background-color: #183B5B !important;
+    color: white !important;
+}
+
+/* Indicadores */
+[data-testid="stMetric"] {
+    background-color: white;
+    border: 1px solid #E2EAF2;
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 3px 12px rgba(25,55,85,0.05);
+}
+
+[data-testid="stMetricValue"] {
+    color: #183B5B;
+    font-weight: 800;
+}
+
+/* Botones */
+.stButton > button {
+    background-color: #183B5B;
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    font-weight: 600;
+    transition: 0.2s;
+}
+
+.stButton > button:hover {
+    background-color: #28577E;
+    color: white;
+    border: none;
+}
+
+/* Selector de fecha */
+[data-testid="stDateInput"] input {
+    border-radius: 10px;
+    border: 1px solid #D5E0EB;
+}
+
+/* Tablas */
+[data-testid="stTable"] {
+    background-color: white;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Imágenes */
+[data-testid="stImage"] img {
+    border-radius: 14px;
+}
+
+/* Barras de progreso */
+.stProgress > div > div > div {
+    background-color: #25845B;
+}
+
+/* Mensajes */
+[data-testid="stAlert"] {
+    border-radius: 12px;
+}
+
+/* Separadores */
+hr {
+    border-color: #DCE5EF;
+}
+
+</style>
+""", unsafe_allow_html=True)
+
+
+# =============================================
+# 3. ENCABEZADO PRINCIPAL
+# =============================================
+
+st.markdown("""
+<div style="
+    background: linear-gradient(115deg, #142D4E, #28577E);
+    padding: 32px;
+    border-radius: 18px;
+    margin-bottom: 25px;
+    box-shadow: 0 5px 18px rgba(20,45,78,0.12);
+">
+
+    <div style="
+        color: #AFC9E1;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 2px;
+    ">
+        SMART CAMPUS · UNIVERSIDAD CATÓLICA
+    </div>
+
+    <div style="
+        color: white;
+        font-size: 32px;
+        font-weight: 800;
+        margin-top: 10px;
+    ">
+        Gestión inteligente de espacios
+    </div>
+
+    <div style="
+        color: #D5E3F0;
+        font-size: 15px;
+        margin-top: 8px;
+    ">
+        Detección de disponibilidad y predicción de ocupación
+        de los espacios comunes del campus.
+    </div>
+
+</div>
+""", unsafe_allow_html=True)
+
+
+# =============================================
+# 4. BUSCAR FOTOGRAFÍAS
+# =============================================
 
 def buscar_fotografias(numeros):
 
@@ -55,36 +218,40 @@ fotos_patio_1 = buscar_fotografias([1, 2, 3])
 fotos_patio_2 = buscar_fotografias([4, 5, 6])
 
 
-# =====================================
-# 3. CARGAR MODELO YOLO
-# =====================================
+# =============================================
+# 5. CARGAR MODELO YOLO
+# =============================================
 
 @st.cache_resource
 def cargar_modelo():
+
     return YOLO("yolov8n.pt")
 
 
 modelo = cargar_modelo()
 
 
-# =====================================
-# 4. COORDENADAS PATIO 1
-# =====================================
+# =============================================
+# 6. COORDENADAS PATIO 1
+# =============================================
 
 mesas_patio_1 = {
+
     "MESA 1": [100, 200, 240, 330],
     "MESA 2": [430, 220, 540, 320],
     "MESA 3": [570, 250, 680, 350],
     "MESA 4": [760, 380, 880, 480],
     "MESA 5": [240, 380, 500, 520]
+
 }
 
 
-# =====================================
-# 5. COORDENADAS PATIO 2
-# =====================================
+# =============================================
+# 7. COORDENADAS PATIO 2
+# =============================================
 
 mesas_patio_2 = {
+
     "MESA 1": [940, 509, 789, 422],
     "MESA 2": [650, 487, 727, 427],
     "MESA 3": [581, 404, 442, 572],
@@ -95,12 +262,13 @@ mesas_patio_2 = {
     "MESA 8": [633, 401, 568, 342],
     "MESA 9": [315, 409, 187, 358],
     "MESA 10": [441, 309, 505, 367]
+
 }
 
 
-# =====================================
-# 6. AJUSTAR COORDENADAS
-# =====================================
+# =============================================
+# 8. AJUSTAR COORDENADAS
+# =============================================
 
 def ajustar_coordenadas(coordenadas, ancho, alto):
 
@@ -130,9 +298,9 @@ def ajustar_coordenadas(coordenadas, ancho, alto):
     return [x_min, y_min, x_max, y_max]
 
 
-# =====================================
-# 7. CALCULAR INTERSECCIÓN
-# =====================================
+# =============================================
+# 9. CALCULAR INTERSECCIÓN
+# =============================================
 
 def calcular_interseccion(caja_mesa, caja_persona):
 
@@ -147,9 +315,9 @@ def calcular_interseccion(caja_mesa, caja_persona):
     )
 
 
-# =====================================
-# 8. ANALIZAR FOTOGRAFÍA
-# =====================================
+# =============================================
+# 10. ANALIZAR FOTOGRAFÍA
+# =============================================
 
 def analizar_fotografia(ruta_foto, mesas):
 
@@ -165,9 +333,11 @@ def analizar_fotografia(ruta_foto, mesas):
     personas = []
 
     if resultado.boxes is not None:
+
         personas = resultado.boxes.xyxy.cpu().numpy()
 
-    # FOTO 05: todas las mesas ocupadas
+    # FOTO 05: TODAS LAS MESAS OCUPADAS
+
     if ruta_foto.stem.lower() == "foto_05":
 
         estados = {
@@ -204,6 +374,7 @@ def analizar_fotografia(ruta_foto, mesas):
                 caja_mesa,
                 caja_persona
             ):
+
                 ocupada = True
                 break
 
@@ -214,9 +385,9 @@ def analizar_fotografia(ruta_foto, mesas):
     return estados, len(personas)
 
 
-# =====================================
-# 9. MOSTRAR MAPA DE DISPONIBILIDAD
-# =====================================
+# =============================================
+# 11. MAPA DE DISPONIBILIDAD
+# =============================================
 
 def mostrar_mapa(estados):
 
@@ -225,6 +396,7 @@ def mostrar_mapa(estados):
     for inicio in range(0, len(nombres), 5):
 
         grupo = nombres[inicio:inicio + 5]
+
         columnas = st.columns(5)
 
         for columna, nombre in zip(columnas, grupo):
@@ -232,11 +404,14 @@ def mostrar_mapa(estados):
             estado = estados[nombre]
 
             if estado == "DISPONIBLE":
-                color = "#D9F2E3"
+
+                color = "#E1F5EA"
                 borde = "#239B56"
                 texto = "#176B3A"
+
             else:
-                color = "#FADBD8"
+
+                color = "#FCE8E6"
                 borde = "#CB4335"
                 texto = "#922B21"
 
@@ -247,13 +422,14 @@ def mostrar_mapa(estados):
                     <div style="
                         background-color: {color};
                         border: 2px solid {borde};
-                        border-radius: 10px;
-                        padding: 18px 5px;
+                        border-radius: 12px;
+                        padding: 20px 5px;
                         text-align: center;
                         margin-bottom: 12px;
                         color: {texto};
                         font-weight: bold;
                         font-size: 16px;
+                        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
                     ">
                         {nombre}
                     </div>
@@ -262,9 +438,9 @@ def mostrar_mapa(estados):
                 )
 
 
-# =====================================
-# 10. MOSTRAR PATIO
-# =====================================
+# =============================================
+# 12. MOSTRAR PATIO
+# =============================================
 
 def mostrar_patio(
     nombre_patio,
@@ -280,13 +456,16 @@ def mostrar_patio(
             f"No se encontraron fotografías para {nombre_patio}. "
             "Revisa los nombres y la ubicación de los archivos."
         )
+
         return
 
     if clave_foto not in st.session_state:
+
         st.session_state[clave_foto] = 0
 
-    # Evitar índices fuera del rango disponible
+    # CORRECCIÓN DE ÍNDICES
     indice = st.session_state[clave_foto] % len(fotografias)
+
     st.session_state[clave_foto] = indice
 
     ruta_foto = fotografias[indice]
@@ -295,7 +474,10 @@ def mostrar_patio(
 
     with columna_foto:
 
-        st.image(str(ruta_foto), width=260)
+        st.image(
+            str(ruta_foto),
+            width=280
+        )
 
         st.caption(f"Fotografía: {ruta_foto.name}")
 
@@ -329,26 +511,56 @@ def mostrar_patio(
             if estado == "OCUPADA"
         )
 
+        total = len(estados)
+
+        st.markdown("#### Resumen de disponibilidad")
+
         metrica1, metrica2, metrica3 = st.columns(3)
 
-        metrica1.metric("Mesas disponibles", disponibles)
-        metrica2.metric("Mesas ocupadas", ocupadas)
-        metrica3.metric("Personas detectadas", cantidad_personas)
+        metrica1.metric(
+            "Mesas disponibles",
+            disponibles,
+            f"de {total}"
+        )
+
+        metrica2.metric(
+            "Mesas ocupadas",
+            ocupadas,
+            f"de {total}"
+        )
+
+        metrica3.metric(
+            "Personas detectadas",
+            cantidad_personas
+        )
+
+        porcentaje_ocupacion = (
+            ocupadas / total * 100
+            if total > 0 else 0
+        )
+
+        st.markdown("**Nivel de ocupación actual**")
+
+        st.progress(porcentaje_ocupacion / 100)
+
+        st.caption(
+            f"{porcentaje_ocupacion:.0f}% de las mesas ocupadas"
+        )
 
     st.divider()
 
-    st.subheader("Mapa de disponibilidad")
+    st.markdown("### Mapa de disponibilidad")
 
     mostrar_mapa(estados)
 
     st.caption(
-        "Verde: mesa disponible · Rojo: mesa ocupada"
+        "🟢 Verde: mesa disponible  ·  🔴 Rojo: mesa ocupada"
     )
 
 
-# =====================================
-# 11. CALENDARIO ACADÉMICO
-# =====================================
+# =============================================
+# 13. ESTIMACIÓN DE OCUPACIÓN DEL CAMPUS
+# =============================================
 
 def estimar_ocupacion(fecha):
 
@@ -390,7 +602,10 @@ def estimar_ocupacion(fecha):
             4: 80
         }
 
-        return porcentajes[fecha.weekday()], "Período de clases"
+        return (
+            porcentajes[fecha.weekday()],
+            "Período de clases"
+        )
 
     if inicio_evaluaciones <= fecha <= fin_evaluaciones:
 
@@ -402,7 +617,10 @@ def estimar_ocupacion(fecha):
             4: 60
         }
 
-        return porcentajes[fecha.weekday()], "Período de evaluaciones"
+        return (
+            porcentajes[fecha.weekday()],
+            "Período de evaluaciones"
+        )
 
     if fecha > fin_evaluaciones:
         return 25, "Cierre del período académico"
@@ -410,9 +628,9 @@ def estimar_ocupacion(fecha):
     return None, "Sin información"
 
 
-# =====================================
-# 12. DESCRIPCIÓN DE CADA DÍA
-# =====================================
+# =============================================
+# 14. DESCRIPCIÓN DEL DÍA
+# =============================================
 
 def describir_dia(fecha):
 
@@ -439,10 +657,7 @@ def describir_dia(fecha):
         return "Comienza el receso académico."
 
     if fecha == fin_receso:
-        return (
-            "Último día del receso académico. "
-            "Las actividades se retoman el 22 de septiembre."
-        )
+        return "Último día del receso académico. Las actividades se retoman el 22 de septiembre."
 
     if fecha == fin_clases:
         return "Último día de clases del segundo período académico."
@@ -486,9 +701,9 @@ def describir_dia(fecha):
     return "Sin información académica específica para esta fecha."
 
 
-# =====================================
-# 13. PREDICCIÓN DE OCUPACIÓN POR HORARIO
-# =====================================
+# =============================================
+# 15. PREDICCIÓN HORARIA
+# =============================================
 
 def predecir_ocupacion_horaria(fecha):
 
@@ -515,31 +730,25 @@ def predecir_ocupacion_horaria(fecha):
         "17:00 - 19:00"
     ]
 
-    # Fuera del calendario académico
     if fecha < inicio_periodo or fecha > fin_periodo:
         return None
 
-    # Fines de semana
     if fecha.weekday() >= 5:
         return [(h, 0) for h in horarios]
 
-    # Suspensiones
     if fecha in suspensiones:
         return [(h, 0) for h in horarios]
 
-    # Receso académico
     if inicio_receso <= fecha <= fin_receso:
 
         porcentajes = [5, 10, 15, 20, 10, 5]
 
         return list(zip(horarios, porcentajes))
 
-    # Período normal de clases
     if inicio_periodo <= fecha <= fin_clases:
 
         ocupacion_diaria, _ = estimar_ocupacion(fecha)
 
-        # Ajustar las horas según el día de la semana
         factor = ocupacion_diaria / 90
 
         porcentajes_base = [45, 70, 90, 100, 65, 30]
@@ -549,22 +758,17 @@ def predecir_ocupacion_horaria(fecha):
             for valor in porcentajes_base
         ]
 
-        # Almuerzo: alta demanda garantizada en la estimación
+        # Almuerzo: máxima demanda estimada
         porcentajes[3] = 100
 
         return list(zip(horarios, porcentajes))
 
-    # Período de evaluaciones
     if inicio_evaluaciones <= fecha <= fin_evaluaciones:
 
-        porcentajes_base = [30, 55, 85, 100, 70, 35]
+        porcentajes = [30, 55, 85, 100, 70, 35]
 
-        # Mantener la hora de almuerzo como máxima demanda
-        porcentajes_base[3] = 100
+        return list(zip(horarios, porcentajes))
 
-        return list(zip(horarios, porcentajes_base))
-
-    # Cierre del período académico
     if fecha <= fin_periodo:
 
         porcentajes = [10, 20, 25, 25, 15, 5]
@@ -574,13 +778,13 @@ def predecir_ocupacion_horaria(fecha):
     return None
 
 
-# =====================================
-# 14. MOSTRAR OCUPACIÓN DEL CAMPUS
-# =====================================
+# =============================================
+# 16. MOSTRAR OCUPACIÓN DEL CAMPUS
+# =============================================
 
 def mostrar_ocupacion_campus():
 
-    st.subheader("Estimación de ocupación del campus")
+    st.markdown("### Análisis del calendario académico")
 
     fecha = st.date_input(
         "Selecciona una fecha",
@@ -592,16 +796,46 @@ def mostrar_ocupacion_campus():
 
     descripcion = describir_dia(fecha)
 
-    st.divider()
+    st.markdown(
+        f"""
+        <div style="
+            background-color: white;
+            border: 1px solid #E2EAF2;
+            border-left: 5px solid #28577E;
+            padding: 22px;
+            border-radius: 12px;
+            margin-top: 15px;
+            margin-bottom: 20px;
+        ">
+            <div style="
+                color: #6B8095;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 1px;
+            ">
+                ACTIVIDAD ACADÉMICA
+            </div>
+            <div style="
+                color: #183B5B;
+                font-size: 19px;
+                font-weight: 700;
+                margin-top: 8px;
+            ">
+                ¿Qué pasa este día?
+            </div>
+            <div style="
+                color: #526477;
+                font-size: 15px;
+                margin-top: 8px;
+            ">
+                {descripcion}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
 
-    # Información académica
-    st.markdown("### ¿Qué pasa este día?")
-
-    st.info(descripcion)
-
-    st.divider()
-
-    # Ocupación general
+    # Indicadores generales
     st.markdown("### Ocupación estimada del campus")
 
     if porcentaje is None:
@@ -610,19 +844,30 @@ def mostrar_ocupacion_campus():
 
     else:
 
-        st.metric(
-            "Ocupación estimada",
-            f"{porcentaje}%"
-        )
+        col1, col2 = st.columns([1, 2])
 
-        st.progress(porcentaje / 100)
+        with col1:
 
-        st.write(f"**Situación:** {periodo}")
+            st.metric(
+                "Ocupación estimada",
+                f"{porcentaje}%"
+            )
+
+        with col2:
+
+            st.write(f"**Situación:** {periodo}")
+
+            st.progress(porcentaje / 100)
 
     st.divider()
 
-    # Predicción por horario
+    # Predicción horaria
     st.markdown("### Predicción de ocupación por horario")
+
+    st.write(
+        "Identificación de los momentos de mayor demanda "
+        "de mesas durante la jornada."
+    )
 
     predicciones = predecir_ocupacion_horaria(fecha)
 
@@ -634,11 +879,6 @@ def mostrar_ocupacion_campus():
 
     else:
 
-        st.write(
-            "Estimación de la probabilidad de encontrar "
-            "las mesas ocupadas durante el día."
-        )
-
         datos = {
             "Horario": [h for h, p in predicciones],
             "Ocupación estimada": [
@@ -648,18 +888,56 @@ def mostrar_ocupacion_campus():
 
         st.table(datos)
 
-        # Gráfico de ocupación por horario
         valores = {
             horario: porcentaje_horario
             for horario, porcentaje_horario in predicciones
         }
 
-        st.bar_chart(valores, y_label="Ocupación estimada (%)")
+        st.markdown("#### Comportamiento de la ocupación")
 
-        st.info(
-            "El horario de almuerzo, entre las 13:00 y las 15:00, "
-            "se considera el momento de mayor demanda, con una "
-            "ocupación estimada del 100% durante clases y evaluaciones."
+        st.bar_chart(
+            valores,
+            y_label="Ocupación estimada (%)"
+        )
+
+        # Horario de almuerzo destacado
+        st.markdown(
+            """
+            <div style="
+                background-color: #FFF4E5;
+                border: 1px solid #F2D2A9;
+                border-left: 5px solid #D97736;
+                border-radius: 12px;
+                padding: 18px;
+                margin-top: 15px;
+            ">
+                <div style="
+                    color: #A95C20;
+                    font-size: 12px;
+                    font-weight: 700;
+                    letter-spacing: 1px;
+                ">
+                    HORARIO DE MAYOR DEMANDA
+                </div>
+                <div style="
+                    color: #7D421C;
+                    font-size: 23px;
+                    font-weight: 800;
+                    margin-top: 5px;
+                ">
+                    13:00 - 15:00 · 100%
+                </div>
+                <div style="
+                    color: #865B3D;
+                    font-size: 14px;
+                    margin-top: 5px;
+                ">
+                    Se estima una ocupación máxima de las mesas
+                    durante el horario de almuerzo.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
     st.caption(
@@ -670,24 +948,29 @@ def mostrar_ocupacion_campus():
     )
 
 
-# =====================================
-# 15. PESTAÑAS PRINCIPALES
-# =====================================
+# =============================================
+# 17. PESTAÑAS PRINCIPALES
+# =============================================
 
 tab1, tab2, tab3 = st.tabs([
-    "Patio 1",
-    "Patio 2",
-    "Ocupación del campus"
+    "📍 Patio 1",
+    "📍 Patio 2",
+    "📊 Ocupación del campus"
 ])
 
 
-# =====================================
+# =============================================
 # PESTAÑA PATIO 1
-# =====================================
+# =============================================
 
 with tab1:
 
-    st.subheader("Disponibilidad - Patio 1")
+    st.markdown("### Disponibilidad de mesas · Patio 1")
+
+    st.write(
+        "Monitoreo visual de las mesas mediante detección "
+        "automática de personas."
+    )
 
     mostrar_patio(
         "Patio 1",
@@ -698,13 +981,18 @@ with tab1:
     )
 
 
-# =====================================
+# =============================================
 # PESTAÑA PATIO 2
-# =====================================
+# =============================================
 
 with tab2:
 
-    st.subheader("Disponibilidad - Patio 2")
+    st.markdown("### Disponibilidad de mesas · Patio 2")
+
+    st.write(
+        "Monitoreo visual de las mesas mediante detección "
+        "automática de personas."
+    )
 
     mostrar_patio(
         "Patio 2",
@@ -715,10 +1003,31 @@ with tab2:
     )
 
 
-# =====================================
+# =============================================
 # PESTAÑA OCUPACIÓN DEL CAMPUS
-# =====================================
+# =============================================
 
 with tab3:
 
     mostrar_ocupacion_campus()
+
+
+# =============================================
+# 18. PIE DE PÁGINA
+# =============================================
+
+st.markdown("""
+<div style="
+    border-top: 1px solid #DCE5EF;
+    margin-top: 40px;
+    padding-top: 18px;
+    text-align: center;
+    color: #8A9BAD;
+    font-size: 12px;
+">
+    SMART CAMPUS UC · SISTEMA DE MONITOREO Y PREDICCIÓN
+    <br>
+    Prototipo académico de inteligencia artificial aplicada
+    a la disponibilidad de espacios universitarios.
+</div>
+""", unsafe_allow_html=True)
