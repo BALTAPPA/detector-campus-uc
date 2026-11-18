@@ -1,6 +1,5 @@
 
 import streamlit as st
-import numpy as np
 from PIL import Image
 from ultralytics import YOLO
 from pathlib import Path
@@ -25,7 +24,6 @@ st.write(
 
 CARPETA = Path(__file__).parent
 
-# Dimensiones originales de referencia de las coordenadas
 ANCHO_REFERENCIA = 1195
 ALTO_REFERENCIA = 896
 
@@ -63,7 +61,6 @@ fotos_patio_2 = buscar_fotografias([4, 5, 6])
 
 @st.cache_resource
 def cargar_modelo():
-
     return YOLO("yolov8n.pt")
 
 
@@ -75,13 +72,11 @@ modelo = cargar_modelo()
 # =====================================
 
 mesas_patio_1 = {
-
     "MESA 1": [100, 200, 240, 330],
     "MESA 2": [430, 220, 540, 320],
     "MESA 3": [570, 250, 680, 350],
     "MESA 4": [760, 380, 880, 480],
     "MESA 5": [240, 380, 500, 520]
-
 }
 
 
@@ -90,7 +85,6 @@ mesas_patio_1 = {
 # =====================================
 
 mesas_patio_2 = {
-
     "MESA 1": [940, 509, 789, 422],
     "MESA 2": [650, 487, 727, 427],
     "MESA 3": [581, 404, 442, 572],
@@ -101,7 +95,6 @@ mesas_patio_2 = {
     "MESA 8": [633, 401, 568, 342],
     "MESA 9": [315, 409, 187, 358],
     "MESA 10": [441, 309, 505, 367]
-
 }
 
 
@@ -113,14 +106,12 @@ def ajustar_coordenadas(coordenadas, ancho, alto):
 
     x1, y1, x2, y2 = coordenadas
 
-    # Corregir coordenadas invertidas
     x_min = min(x1, x2)
     x_max = max(x1, x2)
 
     y_min = min(y1, y2)
     y_max = max(y1, y2)
 
-    # Adaptar al tamaño real de la fotografía
     factor_x = ancho / ANCHO_REFERENCIA
     factor_y = alto / ALTO_REFERENCIA
 
@@ -130,7 +121,6 @@ def ajustar_coordenadas(coordenadas, ancho, alto):
     y_min = int(y_min * factor_y)
     y_max = int(y_max * factor_y)
 
-    # Mantener coordenadas dentro de la imagen
     x_min = max(0, min(x_min, ancho))
     x_max = max(0, min(x_max, ancho))
 
@@ -165,7 +155,6 @@ def analizar_fotografia(ruta_foto, mesas):
 
     imagen = Image.open(ruta_foto).convert("RGB")
 
-    # Detectar personas con YOLO
     resultado = modelo.predict(
         imagen,
         classes=[0],
@@ -176,11 +165,9 @@ def analizar_fotografia(ruta_foto, mesas):
     personas = []
 
     if resultado.boxes is not None:
-
         personas = resultado.boxes.xyxy.cpu().numpy()
 
-    # FOTO 05:
-    # Todas las mesas se consideran ocupadas
+    # FOTO 05: todas las mesas ocupadas
     if ruta_foto.stem.lower() == "foto_05":
 
         estados = {
@@ -190,7 +177,6 @@ def analizar_fotografia(ruta_foto, mesas):
 
         return estados, len(personas)
 
-    # Analizar las demás fotografías
     ancho, alto = imagen.size
 
     estados = {}
@@ -218,17 +204,12 @@ def analizar_fotografia(ruta_foto, mesas):
                 caja_mesa,
                 caja_persona
             ):
-
                 ocupada = True
                 break
 
-        if ocupada:
-
-            estados[nombre_mesa] = "OCUPADA"
-
-        else:
-
-            estados[nombre_mesa] = "DISPONIBLE"
+        estados[nombre_mesa] = (
+            "OCUPADA" if ocupada else "DISPONIBLE"
+        )
 
     return estados, len(personas)
 
@@ -244,7 +225,6 @@ def mostrar_mapa(estados):
     for inicio in range(0, len(nombres), 5):
 
         grupo = nombres[inicio:inicio + 5]
-
         columnas = st.columns(5)
 
         for columna, nombre in zip(columnas, grupo):
@@ -252,13 +232,10 @@ def mostrar_mapa(estados):
             estado = estados[nombre]
 
             if estado == "DISPONIBLE":
-
                 color = "#D9F2E3"
                 borde = "#239B56"
                 texto = "#176B3A"
-
             else:
-
                 color = "#FADBD8"
                 borde = "#CB4335"
                 texto = "#922B21"
@@ -297,40 +274,28 @@ def mostrar_patio(
     clave_foto
 ):
 
-    # Comprobar que existan fotografías
     if not fotografias:
 
         st.warning(
             f"No se encontraron fotografías para {nombre_patio}. "
-            "Revisa que los archivos estén en la carpeta principal "
-            "del proyecto y que sus nombres sean correctos."
+            "Revisa los nombres y la ubicación de los archivos."
         )
-
         return
 
-    # Crear estado inicial
     if clave_foto not in st.session_state:
-
         st.session_state[clave_foto] = 0
 
     # Evitar índices fuera del rango disponible
     indice = st.session_state[clave_foto] % len(fotografias)
-
-    # Guardar el índice corregido
     st.session_state[clave_foto] = indice
 
-    # Seleccionar fotografía
     ruta_foto = fotografias[indice]
 
-    # Distribución de la interfaz
     columna_foto, columna_info = st.columns([1, 2])
 
     with columna_foto:
 
-        st.image(
-            str(ruta_foto),
-            width=260
-        )
+        st.image(str(ruta_foto), width=260)
 
         st.caption(f"Fotografía: {ruta_foto.name}")
 
@@ -345,7 +310,6 @@ def mostrar_patio(
 
             st.rerun()
 
-    # Analizar fotografía
     estados, cantidad_personas = analizar_fotografia(
         ruta_foto,
         mesas
@@ -353,7 +317,6 @@ def mostrar_patio(
 
     st.session_state[clave_estado] = estados
 
-    # Indicadores
     with columna_info:
 
         disponibles = sum(
@@ -368,20 +331,9 @@ def mostrar_patio(
 
         metrica1, metrica2, metrica3 = st.columns(3)
 
-        metrica1.metric(
-            "Mesas disponibles",
-            disponibles
-        )
-
-        metrica2.metric(
-            "Mesas ocupadas",
-            ocupadas
-        )
-
-        metrica3.metric(
-            "Personas detectadas",
-            cantidad_personas
-        )
+        metrica1.metric("Mesas disponibles", disponibles)
+        metrica2.metric("Mesas ocupadas", ocupadas)
+        metrica3.metric("Personas detectadas", cantidad_personas)
 
     st.divider()
 
@@ -395,7 +347,7 @@ def mostrar_patio(
 
 
 # =====================================
-# 11. ESTIMACIÓN DE OCUPACIÓN DEL CAMPUS
+# 11. CALENDARIO ACADÉMICO
 # =====================================
 
 def estimar_ocupacion(fecha):
@@ -417,19 +369,15 @@ def estimar_ocupacion(fecha):
     ]
 
     if fecha < inicio_periodo or fecha > fin_periodo:
-
         return None, "Fuera del período académico"
 
     if fecha.weekday() >= 5:
-
         return 0, "Fin de semana"
 
     if fecha in suspensiones:
-
         return 0, "Suspensión de actividades"
 
     if inicio_receso <= fecha <= fin_receso:
-
         return 10, "Receso académico"
 
     if inicio_periodo <= fecha <= fin_clases:
@@ -442,10 +390,7 @@ def estimar_ocupacion(fecha):
             4: 80
         }
 
-        return (
-            porcentajes[fecha.weekday()],
-            "Período de clases"
-        )
+        return porcentajes[fecha.weekday()], "Período de clases"
 
     if inicio_evaluaciones <= fecha <= fin_evaluaciones:
 
@@ -457,13 +402,9 @@ def estimar_ocupacion(fecha):
             4: 60
         }
 
-        return (
-            porcentajes[fecha.weekday()],
-            "Período de evaluaciones"
-        )
+        return porcentajes[fecha.weekday()], "Período de evaluaciones"
 
     if fecha > fin_evaluaciones:
-
         return 25, "Cierre del período académico"
 
     return None, "Sin información"
@@ -491,84 +432,150 @@ def describir_dia(fecha):
         date(2026, 12, 8)
     ]
 
-    # Fechas importantes
     if fecha == inicio_periodo:
-
         return "Inicio del segundo período académico."
 
     if fecha == inicio_receso:
-
         return "Comienza el receso académico."
 
     if fecha == fin_receso:
-
         return (
             "Último día del receso académico. "
             "Las actividades se retoman el 22 de septiembre."
         )
 
     if fecha == fin_clases:
-
         return "Último día de clases del segundo período académico."
 
     if fecha == inicio_evaluaciones:
-
         return "Comienza el período de evaluaciones."
 
     if fecha == fin_evaluaciones:
-
         return "Último día del período de evaluaciones."
 
     if fecha == fin_periodo:
-
         return "Término del segundo período académico."
 
     if fecha in suspensiones:
-
         return "Suspensión de actividades académicas."
 
-    # Receso académico
     if inicio_receso <= fecha <= fin_receso:
-
         return "Receso académico. No se consideran clases regulares."
 
-    # Período de clases
     if inicio_periodo <= fecha < inicio_receso:
-
         return "Jornada regular de clases del segundo período académico."
 
     if fin_receso < fecha <= fin_clases:
-
         return "Jornada regular de clases del segundo período académico."
 
-    # Evaluaciones
     if inicio_evaluaciones < fecha <= fin_evaluaciones:
-
         return "Período de evaluaciones académicas."
 
-    # Cierre del semestre
     if fin_evaluaciones < fecha <= fin_periodo:
-
         return "Etapa de cierre del período académico."
 
-    # Fin de semana
     if fecha.weekday() >= 5:
-
         return "Fin de semana. No se consideran actividades académicas regulares."
 
     if fecha < inicio_periodo:
-
         return "Fuera del segundo período académico."
 
     if fecha > fin_periodo:
-
         return "Período académico finalizado."
 
     return "Sin información académica específica para esta fecha."
 
 
 # =====================================
-# 13. MOSTRAR OCUPACIÓN DEL CAMPUS
+# 13. PREDICCIÓN DE OCUPACIÓN POR HORARIO
+# =====================================
+
+def predecir_ocupacion_horaria(fecha):
+
+    inicio_periodo = date(2026, 8, 5)
+    inicio_receso = date(2026, 9, 14)
+    fin_receso = date(2026, 9, 21)
+    fin_clases = date(2026, 11, 27)
+
+    inicio_evaluaciones = date(2026, 11, 30)
+    fin_evaluaciones = date(2026, 12, 14)
+    fin_periodo = date(2026, 12, 16)
+
+    suspensiones = [
+        date(2026, 12, 7),
+        date(2026, 12, 8)
+    ]
+
+    horarios = [
+        "08:00 - 10:00",
+        "10:00 - 12:00",
+        "12:00 - 13:00",
+        "13:00 - 15:00",
+        "15:00 - 17:00",
+        "17:00 - 19:00"
+    ]
+
+    # Fuera del calendario académico
+    if fecha < inicio_periodo or fecha > fin_periodo:
+        return None
+
+    # Fines de semana
+    if fecha.weekday() >= 5:
+        return [(h, 0) for h in horarios]
+
+    # Suspensiones
+    if fecha in suspensiones:
+        return [(h, 0) for h in horarios]
+
+    # Receso académico
+    if inicio_receso <= fecha <= fin_receso:
+
+        porcentajes = [5, 10, 15, 20, 10, 5]
+
+        return list(zip(horarios, porcentajes))
+
+    # Período normal de clases
+    if inicio_periodo <= fecha <= fin_clases:
+
+        ocupacion_diaria, _ = estimar_ocupacion(fecha)
+
+        # Ajustar las horas según el día de la semana
+        factor = ocupacion_diaria / 90
+
+        porcentajes_base = [45, 70, 90, 100, 65, 30]
+
+        porcentajes = [
+            min(100, round(valor * factor))
+            for valor in porcentajes_base
+        ]
+
+        # Almuerzo: alta demanda garantizada en la estimación
+        porcentajes[3] = 100
+
+        return list(zip(horarios, porcentajes))
+
+    # Período de evaluaciones
+    if inicio_evaluaciones <= fecha <= fin_evaluaciones:
+
+        porcentajes_base = [30, 55, 85, 100, 70, 35]
+
+        # Mantener la hora de almuerzo como máxima demanda
+        porcentajes_base[3] = 100
+
+        return list(zip(horarios, porcentajes_base))
+
+    # Cierre del período académico
+    if fecha <= fin_periodo:
+
+        porcentajes = [10, 20, 25, 25, 15, 5]
+
+        return list(zip(horarios, porcentajes))
+
+    return None
+
+
+# =====================================
+# 14. MOSTRAR OCUPACIÓN DEL CAMPUS
 # =====================================
 
 def mostrar_ocupacion_campus():
@@ -581,7 +588,6 @@ def mostrar_ocupacion_campus():
         key="fecha_campus"
     )
 
-    # Obtener información del día
     porcentaje, periodo = estimar_ocupacion(fecha)
 
     descripcion = describir_dia(fecha)
@@ -595,8 +601,8 @@ def mostrar_ocupacion_campus():
 
     st.divider()
 
-    # Estimación de ocupación
-    st.markdown("### Ocupación estimada")
+    # Ocupación general
+    st.markdown("### Ocupación estimada del campus")
 
     if porcentaje is None:
 
@@ -613,15 +619,59 @@ def mostrar_ocupacion_campus():
 
         st.write(f"**Situación:** {periodo}")
 
+    st.divider()
+
+    # Predicción por horario
+    st.markdown("### Predicción de ocupación por horario")
+
+    predicciones = predecir_ocupacion_horaria(fecha)
+
+    if predicciones is None:
+
+        st.warning(
+            "No hay una predicción disponible para esta fecha."
+        )
+
+    else:
+
+        st.write(
+            "Estimación de la probabilidad de encontrar "
+            "las mesas ocupadas durante el día."
+        )
+
+        datos = {
+            "Horario": [h for h, p in predicciones],
+            "Ocupación estimada": [
+                f"{p}%" for h, p in predicciones
+            ]
+        }
+
+        st.table(datos)
+
+        # Gráfico de ocupación por horario
+        valores = {
+            horario: porcentaje_horario
+            for horario, porcentaje_horario in predicciones
+        }
+
+        st.bar_chart(valores, y_label="Ocupación estimada (%)")
+
+        st.info(
+            "El horario de almuerzo, entre las 13:00 y las 15:00, "
+            "se considera el momento de mayor demanda, con una "
+            "ocupación estimada del 100% durante clases y evaluaciones."
+        )
+
     st.caption(
-        "La ocupación corresponde a una estimación referencial "
-        "basada en el calendario académico y no representa "
-        "mediciones reales de ocupación."
+        "Las predicciones horarias son estimaciones referenciales "
+        "basadas en el calendario académico y patrones de uso "
+        "supuestos. No corresponden a mediciones reales ni a "
+        "predicciones entrenadas con registros históricos."
     )
 
 
 # =====================================
-# 14. PESTAÑAS PRINCIPALES
+# 15. PESTAÑAS PRINCIPALES
 # =====================================
 
 tab1, tab2, tab3 = st.tabs([
