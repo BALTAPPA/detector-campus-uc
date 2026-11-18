@@ -27,13 +27,10 @@ ALTO_REFERENCIA = 896
 
 st.markdown("""
 <style>
-
-/* Fondo general */
 .stApp {
     background-color: #F4F7FB;
 }
 
-/* Ocultar elementos de Streamlit */
 #MainMenu {
     visibility: hidden;
 }
@@ -42,25 +39,21 @@ footer {
     visibility: hidden;
 }
 
-/* Contenedor principal */
 .block-container {
     padding-top: 2rem;
     padding-bottom: 3rem;
     max-width: 1450px;
 }
 
-/* Títulos */
 h1, h2, h3 {
     color: #183B5B !important;
     font-weight: 750 !important;
 }
 
-/* Texto */
 p, label {
     color: #526477;
 }
 
-/* Pestañas */
 .stTabs [data-baseweb="tab-list"] {
     gap: 12px;
     border-bottom: 1px solid #DCE5EF;
@@ -79,7 +72,6 @@ p, label {
     color: white !important;
 }
 
-/* Indicadores */
 [data-testid="stMetric"] {
     background-color: white;
     border: 1px solid #E2EAF2;
@@ -93,7 +85,6 @@ p, label {
     font-weight: 800;
 }
 
-/* Botones */
 .stButton > button {
     background-color: #183B5B;
     color: white;
@@ -110,45 +101,38 @@ p, label {
     border: none;
 }
 
-/* Selector de fecha */
 [data-testid="stDateInput"] input {
     border-radius: 10px;
     border: 1px solid #D5E0EB;
 }
 
-/* Tablas */
 [data-testid="stTable"] {
     background-color: white;
     border-radius: 12px;
     overflow: hidden;
 }
 
-/* Imágenes */
 [data-testid="stImage"] img {
     border-radius: 14px;
 }
 
-/* Barras de progreso */
 .stProgress > div > div > div {
     background-color: #25845B;
 }
 
-/* Mensajes */
 [data-testid="stAlert"] {
     border-radius: 12px;
 }
 
-/* Separadores */
 hr {
     border-color: #DCE5EF;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
 
 # =============================================
-# 3. ENCABEZADO PRINCIPAL
+# 3. ENCABEZADO PRINCIPAL CORREGIDO
 # =============================================
 
 st.markdown("""
@@ -333,7 +317,6 @@ def analizar_fotografia(ruta_foto, mesas):
     personas = []
 
     if resultado.boxes is not None:
-
         personas = resultado.boxes.xyxy.cpu().numpy()
 
     # FOTO 05: TODAS LAS MESAS OCUPADAS
@@ -460,10 +443,8 @@ def mostrar_patio(
         return
 
     if clave_foto not in st.session_state:
-
         st.session_state[clave_foto] = 0
 
-    # CORRECCIÓN DE ÍNDICES
     indice = st.session_state[clave_foto] % len(fotografias)
 
     st.session_state[clave_foto] = indice
@@ -815,6 +796,7 @@ def mostrar_ocupacion_campus():
             ">
                 ACTIVIDAD ACADÉMICA
             </div>
+
             <div style="
                 color: #183B5B;
                 font-size: 19px;
@@ -823,6 +805,7 @@ def mostrar_ocupacion_campus():
             ">
                 ¿Qué pasa este día?
             </div>
+
             <div style="
                 color: #526477;
                 font-size: 15px;
@@ -835,7 +818,6 @@ def mostrar_ocupacion_campus():
         unsafe_allow_html=True
     )
 
-    # Indicadores generales
     st.markdown("### Ocupación estimada del campus")
 
     if porcentaje is None:
@@ -861,7 +843,6 @@ def mostrar_ocupacion_campus():
 
     st.divider()
 
-    # Predicción horaria
     st.markdown("### Predicción de ocupación por horario")
 
     st.write(
@@ -900,7 +881,6 @@ def mostrar_ocupacion_campus():
             y_label="Ocupación estimada (%)"
         )
 
-        # Horario de almuerzo destacado
         st.markdown(
             """
             <div style="
@@ -919,6 +899,7 @@ def mostrar_ocupacion_campus():
                 ">
                     HORARIO DE MAYOR DEMANDA
                 </div>
+
                 <div style="
                     color: #7D421C;
                     font-size: 23px;
@@ -927,6 +908,7 @@ def mostrar_ocupacion_campus():
                 ">
                     13:00 - 15:00 · 100%
                 </div>
+
                 <div style="
                     color: #865B3D;
                     font-size: 14px;
@@ -960,7 +942,7 @@ tab1, tab2, tab3 = st.tabs([
 
 
 # =============================================
-# PESTAÑA PATIO 1
+# 18. PESTAÑA PATIO 1
 # =============================================
 
 with tab1:
@@ -982,7 +964,7 @@ with tab1:
 
 
 # =============================================
-# PESTAÑA PATIO 2
+# 19. PESTAÑA PATIO 2
 # =============================================
 
 with tab2:
@@ -1004,7 +986,7 @@ with tab2:
 
 
 # =============================================
-# PESTAÑA OCUPACIÓN DEL CAMPUS
+# 20. PESTAÑA OCUPACIÓN DEL CAMPUS
 # =============================================
 
 with tab3:
@@ -1013,7 +995,7 @@ with tab3:
 
 
 # =============================================
-# 18. PIE DE PÁGINA
+# 21. PIE DE PÁGINA
 # =============================================
 
 st.markdown("""
