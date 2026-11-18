@@ -165,8 +165,6 @@ def analizar_fotografia(ruta_foto, mesas):
 
     imagen = Image.open(ruta_foto).convert("RGB")
 
-    ancho, alto = imagen.size
-
     # Detectar personas con YOLO
     resultado = modelo.predict(
         imagen,
@@ -193,6 +191,8 @@ def analizar_fotografia(ruta_foto, mesas):
         return estados, len(personas)
 
     # Analizar las demás fotografías
+    ancho, alto = imagen.size
+
     estados = {}
 
     for nombre_mesa, coordenadas in mesas.items():
@@ -313,8 +313,7 @@ def mostrar_patio(
 
         st.session_state[clave_foto] = 0
 
-    # CORRECCIÓN DEL ERROR:
-    # Evitar que el índice supere la cantidad de fotografías.
+    # Evitar índices fuera del rango disponible
     indice = st.session_state[clave_foto] % len(fotografias)
 
     # Guardar el índice corregido
@@ -470,6 +469,108 @@ def estimar_ocupacion(fecha):
     return None, "Sin información"
 
 
+# =====================================
+# 12. DESCRIPCIÓN DE CADA DÍA
+# =====================================
+
+def describir_dia(fecha):
+
+    inicio_periodo = date(2026, 8, 5)
+    inicio_receso = date(2026, 9, 14)
+    fin_receso = date(2026, 9, 21)
+
+    fin_clases = date(2026, 11, 27)
+
+    inicio_evaluaciones = date(2026, 11, 30)
+    fin_evaluaciones = date(2026, 12, 14)
+
+    fin_periodo = date(2026, 12, 16)
+
+    suspensiones = [
+        date(2026, 12, 7),
+        date(2026, 12, 8)
+    ]
+
+    # Fechas importantes
+    if fecha == inicio_periodo:
+
+        return "Inicio del segundo período académico."
+
+    if fecha == inicio_receso:
+
+        return "Comienza el receso académico."
+
+    if fecha == fin_receso:
+
+        return (
+            "Último día del receso académico. "
+            "Las actividades se retoman el 22 de septiembre."
+        )
+
+    if fecha == fin_clases:
+
+        return "Último día de clases del segundo período académico."
+
+    if fecha == inicio_evaluaciones:
+
+        return "Comienza el período de evaluaciones."
+
+    if fecha == fin_evaluaciones:
+
+        return "Último día del período de evaluaciones."
+
+    if fecha == fin_periodo:
+
+        return "Término del segundo período académico."
+
+    if fecha in suspensiones:
+
+        return "Suspensión de actividades académicas."
+
+    # Receso académico
+    if inicio_receso <= fecha <= fin_receso:
+
+        return "Receso académico. No se consideran clases regulares."
+
+    # Período de clases
+    if inicio_periodo <= fecha < inicio_receso:
+
+        return "Jornada regular de clases del segundo período académico."
+
+    if fin_receso < fecha <= fin_clases:
+
+        return "Jornada regular de clases del segundo período académico."
+
+    # Evaluaciones
+    if inicio_evaluaciones < fecha <= fin_evaluaciones:
+
+        return "Período de evaluaciones académicas."
+
+    # Cierre del semestre
+    if fin_evaluaciones < fecha <= fin_periodo:
+
+        return "Etapa de cierre del período académico."
+
+    # Fin de semana
+    if fecha.weekday() >= 5:
+
+        return "Fin de semana. No se consideran actividades académicas regulares."
+
+    if fecha < inicio_periodo:
+
+        return "Fuera del segundo período académico."
+
+    if fecha > fin_periodo:
+
+        return "Período académico finalizado."
+
+    return "Sin información académica específica para esta fecha."
+
+
+# =====================================
+# 13. MOSTRAR OCUPACIÓN DEL CAMPUS
+# =====================================
+
 def mostrar_ocupacion_campus():
 
     st.subheader("Estimación de ocupación del campus")
@@ -480,7 +581,22 @@ def mostrar_ocupacion_campus():
         key="fecha_campus"
     )
 
+    # Obtener información del día
     porcentaje, periodo = estimar_ocupacion(fecha)
+
+    descripcion = describir_dia(fecha)
+
+    st.divider()
+
+    # Información académica
+    st.markdown("### ¿Qué pasa este día?")
+
+    st.info(descripcion)
+
+    st.divider()
+
+    # Estimación de ocupación
+    st.markdown("### Ocupación estimada")
 
     if porcentaje is None:
 
@@ -498,14 +614,14 @@ def mostrar_ocupacion_campus():
         st.write(f"**Situación:** {periodo}")
 
     st.caption(
-        "Esta información corresponde a una estimación "
-        "referencial basada en el calendario académico y "
-        "no representa mediciones reales de ocupación."
+        "La ocupación corresponde a una estimación referencial "
+        "basada en el calendario académico y no representa "
+        "mediciones reales de ocupación."
     )
 
 
 # =====================================
-# 12. PESTAÑAS PRINCIPALES
+# 14. PESTAÑAS PRINCIPALES
 # =====================================
 
 tab1, tab2, tab3 = st.tabs([
