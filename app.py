@@ -2,7 +2,7 @@
 import streamlit as st
 import random
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageDraw
 from ultralytics import YOLO
 from datetime import date
 
@@ -101,11 +101,9 @@ def analizar_fotografia(ruta_foto, modelo, mesas):
 
         x1, y1, x2, y2 = coordenadas
 
-        # Ordenar coordenadas para evitar errores
         x1, x2 = sorted([x1, x2])
         y1, y2 = sorted([y1, y2])
 
-        # Ajustar coordenadas al tamaño de la fotografia
         x1 = max(0, min(x1, ancho))
         x2 = max(0, min(x2, ancho))
 
@@ -130,10 +128,8 @@ def analizar_fotografia(ruta_foto, modelo, mesas):
 
 
 # =====================================
-# 5. COORDENADAS DE LAS MESAS
+# 5. COORDENADAS DEL PATIO 1
 # =====================================
-
-# PATIO 1: 5 MESAS
 
 mesas_patio_1 = {
     "MESA 1": [100, 200, 240, 330],
@@ -144,49 +140,132 @@ mesas_patio_1 = {
 }
 
 
-# PATIO 2: 10 MESAS
-# Coordenadas iniciales provisionales.
-# Se pueden modificar desde la aplicacion.
+# =====================================
+# 6. COLORES DE LAS MESAS
+# =====================================
 
-COORDENADAS_INICIALES_PATIO_2 = {
-    f"MESA {i}": [100, 100, 200, 200]
-    for i in range(1, 11)
-}
+COLORES_MESAS = [
+    (230, 50, 50),
+    (30, 120, 230),
+    (20, 160, 80),
+    (230, 150, 20),
+    (150, 70, 210),
+    (20, 170, 170),
+    (220, 70, 150),
+    (120, 120, 30),
+    (80, 80, 220),
+    (230, 100, 40)
+]
 
 
 # =====================================
-# 6. CONFIGURACION DE MESAS PATIO 2
+# 7. CONFIGURAR LAS 10 MESAS DEL PATIO 2
 # =====================================
 
-def configurar_mesas_patio_2():
+def configurar_mesas_patio_2(foto):
 
     st.subheader("⚙️ Configuración de mesas - Patio 2")
 
+    imagen = Image.open(foto).convert("RGB")
+
+    ancho, alto = imagen.size
+
     st.write(
-        "Modifica las coordenadas de cada mesa "
-        "para ajustarlas a su ubicación en la fotografía."
+        f"Dimensiones de la fotografía: {ancho} x {alto} píxeles."
     )
 
-    # Inicializar coordenadas
+    st.write(
+        "Ajusta las coordenadas de cada mesa. "
+        "Los rectángulos de colores se actualizarán sobre la fotografía."
+    )
+
+    # ---------------------------------
+    # INICIALIZAR COORDENADAS
+    # ---------------------------------
+
     if "coordenadas_patio_2" not in st.session_state:
 
-        st.session_state.coordenadas_patio_2 = {
-            nombre: coordenadas.copy()
-            for nombre, coordenadas
-            in COORDENADAS_INICIALES_PATIO_2.items()
-        }
+        st.session_state.coordenadas_patio_2 = {}
 
-    # Configuracion individual de cada mesa
+        ancho_caja = max(30, int(ancho * 0.12))
+        alto_caja = max(30, int(alto * 0.12))
+
+        for i in range(1, 11):
+
+            columna = (i - 1) % 5
+            fila = (i - 1) // 5
+
+            x1 = int((columna + 0.5) * ancho / 5 - ancho_caja / 2)
+            y1 = int((fila + 0.5) * alto / 2 - alto_caja / 2)
+
+            x1 = max(0, min(x1, ancho - ancho_caja))
+            y1 = max(0, min(y1, alto - alto_caja))
+
+            st.session_state.coordenadas_patio_2[f"MESA {i}"] = [
+                x1,
+                y1,
+                x1 + ancho_caja,
+                y1 + alto_caja
+            ]
+
+    # ---------------------------------
+    # AJUSTAR COORDENADAS CON SLIDERS
+    # ---------------------------------
+
+    mesas_actualizadas = {}
 
     for i in range(1, 11):
 
         nombre = f"MESA {i}"
 
-        with st.expander(nombre):
+        coordenadas = st.session_state.coordenadas_patio_2[nombre]
 
-            coordenadas = st.session_state.coordenadas_patio_2[nombre]
+        x1, y1, x2, y2 = coordenadas
 
-            x1, y1, x2, y2 = coordenadas
+        # Evitar valores fuera de la fotografía
+
+        x1 = max(0, min(x1, ancho))
+        x2 = max(0, min(x2, ancho))
+
+        y1 = max(0, min(y1, alto))
+        y2 = max(0, min(y2, alto))
+
+        # Inicializar valores de los controles
+
+        valores_iniciales = {
+            f"x1_p2_{i}": x1,
+            f"y1_p2_{i}": y1,
+            f"x2_p2_{i}": x2,
+            f"y2_p2_{i}": y2
+        }
+
+        for clave, valor in valores_iniciales.items():
+
+            if clave not in st.session_state:
+                st.session_state[clave] = valor
+
+            else:
+                st.session_state[clave] = max(
+                    0,
+                    min(st.session_state[clave],
+                        ancho if clave.startswith("x") else alto)
+                )
+
+        # ---------------------------------
+        # CONTROLES DE CADA MESA
+        # ---------------------------------
+
+        color = COLORES_MESAS[i - 1]
+
+        color_hex = "#{:02X}{:02X}{:02X}".format(*color)
+
+        with st.expander(f"🟦 MESA {i}", expanded=False):
+
+            st.markdown(
+                f"**Mesa {i}** — Color de referencia: "
+                f"<span style='color:{color_hex};'>●</span>",
+                unsafe_allow_html=True
+            )
 
             col1, col2 = st.columns(2)
 
@@ -194,17 +273,15 @@ def configurar_mesas_patio_2():
 
                 nuevo_x1 = st.slider(
                     "X inicial",
-                    min_value=0,
-                    max_value=2000,
-                    value=x1,
+                    0,
+                    ancho,
                     key=f"x1_p2_{i}"
                 )
 
                 nuevo_y1 = st.slider(
                     "Y inicial",
-                    min_value=0,
-                    max_value=2000,
-                    value=y1,
+                    0,
+                    alto,
                     key=f"y1_p2_{i}"
                 )
 
@@ -212,37 +289,108 @@ def configurar_mesas_patio_2():
 
                 nuevo_x2 = st.slider(
                     "X final",
-                    min_value=0,
-                    max_value=2000,
-                    value=x2,
+                    0,
+                    ancho,
                     key=f"x2_p2_{i}"
                 )
 
                 nuevo_y2 = st.slider(
                     "Y final",
-                    min_value=0,
-                    max_value=2000,
-                    value=y2,
+                    0,
+                    alto,
                     key=f"y2_p2_{i}"
                 )
 
-            # Guardar nuevas coordenadas
+            st.caption(
+                f"Coordenadas: ({nuevo_x1}, {nuevo_y1}) "
+                f"hasta ({nuevo_x2}, {nuevo_y2})"
+            )
 
-            st.session_state.coordenadas_patio_2[nombre] = [
-                nuevo_x1,
-                nuevo_y1,
-                nuevo_x2,
-                nuevo_y2
-            ]
+        mesas_actualizadas[nombre] = [
+            nuevo_x1,
+            nuevo_y1,
+            nuevo_x2,
+            nuevo_y2
+        ]
 
-    return st.session_state.coordenadas_patio_2
+    # Guardar las coordenadas
+
+    st.session_state.coordenadas_patio_2 = mesas_actualizadas
+
+    # =================================
+    # 8. DIBUJAR RECTANGULOS SOBRE FOTO
+    # =================================
+
+    imagen_previa = imagen.copy()
+
+    dibujo = ImageDraw.Draw(imagen_previa)
+
+    grosor = max(3, int(min(ancho, alto) * 0.005))
+
+    for i in range(1, 11):
+
+        nombre = f"MESA {i}"
+
+        x1, y1, x2, y2 = mesas_actualizadas[nombre]
+
+        x1, x2 = sorted([x1, x2])
+        y1, y2 = sorted([y1, y2])
+
+        color = COLORES_MESAS[i - 1]
+
+        # Rectangulo de la mesa
+
+        dibujo.rectangle(
+            [x1, y1, x2, y2],
+            outline=color,
+            width=grosor
+        )
+
+        # Etiqueta de la mesa
+
+        etiqueta = f"MESA {i}"
+
+        dibujo.text(
+            (x1 + 4, y1 + 4),
+            etiqueta,
+            fill=color,
+            stroke_width=2,
+            stroke_fill=(255, 255, 255)
+        )
+
+    # ---------------------------------
+    # MOSTRAR FOTO CON RECTANGULOS
+    # ---------------------------------
+
+    st.divider()
+
+    st.subheader("Vista previa de calibración")
+
+    st.image(
+        imagen_previa,
+        caption="Rectángulos de colores: ubicación de las 10 mesas",
+        use_container_width=True
+    )
+
+    st.caption(
+        "Cada color representa una mesa. "
+        "Los rectángulos se actualizan al mover los controles."
+    )
+
+    return mesas_actualizadas
 
 
 # =====================================
-# 7. FUNCION PARA MOSTRAR CADA PATIO
+# 9. MOSTRAR CADA PATIO
 # =====================================
 
-def mostrar_patio(nombre_patio, fotografias, mesas, clave):
+def mostrar_patio(
+    nombre_patio,
+    fotografias,
+    mesas,
+    clave,
+    configurar=False
+):
 
     st.subheader(f"Disponibilidad - {nombre_patio}")
 
@@ -284,22 +432,13 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
             key=f"boton_{clave}"
         ):
 
-            if len(fotografias) > 1:
+            opciones = [
+                foto for foto in fotografias
+                if foto != st.session_state[clave_foto]
+            ]
 
-                opciones = [
-                    foto for foto in fotografias
-                    if foto != st.session_state[clave_foto]
-                ]
-
+            if opciones:
                 st.session_state[clave_foto] = random.choice(opciones)
-
-            else:
-
-                st.info("Solo hay una fotografía disponible.")
-
-    # ---------------------------------
-    # MINIATURA DE LA FOTOGRAFIA
-    # ---------------------------------
 
     with col1:
 
@@ -311,7 +450,19 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
         st.caption(st.session_state[clave_foto].name)
 
     # ---------------------------------
-    # COMPROBAR CAMBIOS
+    # CONFIGURACION VISUAL PATIO 2
+    # ---------------------------------
+
+    if configurar:
+
+        mesas = configurar_mesas_patio_2(
+            st.session_state[clave_foto]
+        )
+
+        st.divider()
+
+    # ---------------------------------
+    # IDENTIFICAR CAMBIOS
     # ---------------------------------
 
     firma_foto = str(st.session_state[clave_foto])
@@ -321,21 +472,44 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
         for nombre, coordenadas in mesas.items()
     )
 
-    # Reanalizar si cambia la fotografia
-    # o las coordenadas de las mesas
-
-    necesita_analisis = (
+    foto_cambio = (
         clave_procesada not in st.session_state
         or st.session_state[clave_procesada] != firma_foto
-        or clave_configuracion not in st.session_state
+    )
+
+    coordenadas_cambiadas = (
+        clave_configuracion not in st.session_state
         or st.session_state[clave_configuracion] != firma_coordenadas
     )
 
     # ---------------------------------
-    # ANALIZAR FOTOGRAFIA
+    # BOTON DE ANALISIS
     # ---------------------------------
 
-    if necesita_analisis:
+    analizar_ahora = False
+
+    if configurar:
+
+        analizar_ahora = st.button(
+            "🔍 Analizar disponibilidad con estas coordenadas",
+            key=f"analizar_{clave}",
+            type="primary"
+        )
+
+    # Analisis inicial o cuando cambia la fotografia
+
+    if (
+        clave_estados not in st.session_state
+        or foto_cambio
+    ):
+
+        analizar_ahora = True
+
+    # ---------------------------------
+    # EJECUTAR YOLO
+    # ---------------------------------
+
+    if analizar_ahora:
 
         modelo = cargar_modelo()
 
@@ -354,9 +528,20 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
 
             st.session_state[clave_configuracion] = firma_coordenadas
 
+    elif configurar and coordenadas_cambiadas:
+
+        st.info(
+            "Has modificado las coordenadas. "
+            "Cuando termines de ajustar los rectángulos, "
+            "presiona el botón de análisis."
+        )
+
     # ---------------------------------
-    # RESULTADOS
+    # MOSTRAR RESULTADOS
     # ---------------------------------
+
+    if clave_estados not in st.session_state:
+        return
 
     estados = st.session_state[clave_estados]
 
@@ -374,6 +559,8 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
 
     st.divider()
 
+    st.subheader("Resultados del análisis")
+
     c1, c2, c3 = st.columns(3)
 
     c1.metric("Total de mesas", len(mesas))
@@ -383,6 +570,13 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
     st.caption(
         f"Personas detectadas: {cantidad_personas}"
     )
+
+    if configurar and coordenadas_cambiadas and not analizar_ahora:
+
+        st.warning(
+            "El mapa todavía muestra el último análisis realizado. "
+            "Pulsa el botón de análisis para actualizarlo."
+        )
 
     st.divider()
 
@@ -421,8 +615,6 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
 
     nombres_mesas = list(mesas.keys())
 
-    # Mostrar mesas en filas de tres
-
     for inicio in range(0, len(nombres_mesas), 3):
 
         columnas = st.columns(3)
@@ -436,7 +628,7 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
 
 
 # =====================================
-# 8. PESTAÑAS
+# 10. PESTAÑAS
 # =====================================
 
 pestana1, pestana2, pestana3 = st.tabs([
@@ -466,15 +658,15 @@ with pestana1:
 
 with pestana2:
 
-    mesas_patio_2 = configurar_mesas_patio_2()
-
-    st.divider()
-
     mostrar_patio(
         "Patio 2",
         FOTOS_PATIO_2,
-        mesas_patio_2,
-        "patio2"
+        {
+            f"MESA {i}": [100, 100, 200, 200]
+            for i in range(1, 11)
+        },
+        "patio2",
+        configurar=True
     )
 
 
