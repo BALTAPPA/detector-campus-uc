@@ -132,10 +132,10 @@ hr {
 
 
 # =============================================
-# 3. ENCABEZADO PRINCIPAL CORREGIDO
+# 3. ENCABEZADO PRINCIPAL
 # =============================================
 
-st.markdown("""
+st.html("""
 <div style="
     background: linear-gradient(115deg, #142D4E, #28577E);
     padding: 32px;
@@ -172,7 +172,7 @@ st.markdown("""
     </div>
 
 </div>
-""", unsafe_allow_html=True)
+""")
 
 
 # =============================================
@@ -400,25 +400,22 @@ def mostrar_mapa(estados):
 
             with columna:
 
-                st.markdown(
-                    f"""
-                    <div style="
-                        background-color: {color};
-                        border: 2px solid {borde};
-                        border-radius: 12px;
-                        padding: 20px 5px;
-                        text-align: center;
-                        margin-bottom: 12px;
-                        color: {texto};
-                        font-weight: bold;
-                        font-size: 16px;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-                    ">
-                        {nombre}
-                    </div>
-                    """,
-                    unsafe_allow_html=True
-                )
+                st.html(f"""
+                <div style="
+                    background-color: {color};
+                    border: 2px solid {borde};
+                    border-radius: 12px;
+                    padding: 20px 5px;
+                    text-align: center;
+                    margin-bottom: 12px;
+                    color: {texto};
+                    font-weight: bold;
+                    font-size: 16px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+                ">
+                    {nombre}
+                </div>
+                """)
 
 
 # =============================================
@@ -777,46 +774,51 @@ def mostrar_ocupacion_campus():
 
     descripcion = describir_dia(fecha)
 
-    st.markdown(
-        f"""
+    # TARJETA DE ACTIVIDAD ACADÉMICA
+    # Se utiliza st.html() para evitar que el HTML
+    # aparezca como texto en la interfaz.
+
+    st.html(f"""
+    <div style="
+        background-color: white;
+        border: 1px solid #E2EAF2;
+        border-left: 5px solid #28577E;
+        padding: 22px;
+        border-radius: 12px;
+        margin-top: 15px;
+        margin-bottom: 20px;
+    ">
+
         <div style="
-            background-color: white;
-            border: 1px solid #E2EAF2;
-            border-left: 5px solid #28577E;
-            padding: 22px;
-            border-radius: 12px;
-            margin-top: 15px;
-            margin-bottom: 20px;
+            color: #6B8095;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1px;
         ">
-            <div style="
-                color: #6B8095;
-                font-size: 12px;
-                font-weight: 700;
-                letter-spacing: 1px;
-            ">
-                ACTIVIDAD ACADÉMICA
-            </div>
-
-            <div style="
-                color: #183B5B;
-                font-size: 19px;
-                font-weight: 700;
-                margin-top: 8px;
-            ">
-                ¿Qué pasa este día?
-            </div>
-
-            <div style="
-                color: #526477;
-                font-size: 15px;
-                margin-top: 8px;
-            ">
-                {descripcion}
-            </div>
+            ACTIVIDAD ACADÉMICA
         </div>
-        """,
-        unsafe_allow_html=True
-    )
+
+        <div style="
+            color: #183B5B;
+            font-size: 19px;
+            font-weight: 700;
+            margin-top: 8px;
+        ">
+            ¿Qué pasa este día?
+        </div>
+
+        <div style="
+            color: #526477;
+            font-size: 15px;
+            margin-top: 8px;
+        ">
+            {descripcion}
+        </div>
+
+    </div>
+    """)
+
+    # OCUPACIÓN GENERAL
 
     st.markdown("### Ocupación estimada del campus")
 
@@ -842,6 +844,8 @@ def mostrar_ocupacion_campus():
             st.progress(porcentaje / 100)
 
     st.divider()
+
+    # PREDICCIÓN HORARIA
 
     st.markdown("### Predicción de ocupación por horario")
 
@@ -881,46 +885,47 @@ def mostrar_ocupacion_campus():
             y_label="Ocupación estimada (%)"
         )
 
-        st.markdown(
-            """
+        # TARJETA DE HORARIO DE MAYOR DEMANDA
+
+        st.html("""
+        <div style="
+            background-color: #FFF4E5;
+            border: 1px solid #F2D2A9;
+            border-left: 5px solid #D97736;
+            border-radius: 12px;
+            padding: 18px;
+            margin-top: 15px;
+        ">
+
             <div style="
-                background-color: #FFF4E5;
-                border: 1px solid #F2D2A9;
-                border-left: 5px solid #D97736;
-                border-radius: 12px;
-                padding: 18px;
-                margin-top: 15px;
+                color: #A95C20;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 1px;
             ">
-                <div style="
-                    color: #A95C20;
-                    font-size: 12px;
-                    font-weight: 700;
-                    letter-spacing: 1px;
-                ">
-                    HORARIO DE MAYOR DEMANDA
-                </div>
-
-                <div style="
-                    color: #7D421C;
-                    font-size: 23px;
-                    font-weight: 800;
-                    margin-top: 5px;
-                ">
-                    13:00 - 15:00 · 100%
-                </div>
-
-                <div style="
-                    color: #865B3D;
-                    font-size: 14px;
-                    margin-top: 5px;
-                ">
-                    Se estima una ocupación máxima de las mesas
-                    durante el horario de almuerzo.
-                </div>
+                HORARIO DE MAYOR DEMANDA
             </div>
-            """,
-            unsafe_allow_html=True
-        )
+
+            <div style="
+                color: #7D421C;
+                font-size: 23px;
+                font-weight: 800;
+                margin-top: 5px;
+            ">
+                13:00 - 15:00 · 100%
+            </div>
+
+            <div style="
+                color: #865B3D;
+                font-size: 14px;
+                margin-top: 5px;
+            ">
+                Se estima una ocupación máxima de las mesas
+                durante el horario de almuerzo.
+            </div>
+
+        </div>
+        """)
 
     st.caption(
         "Las predicciones horarias son estimaciones referenciales "
@@ -998,7 +1003,7 @@ with tab3:
 # 21. PIE DE PÁGINA
 # =============================================
 
-st.markdown("""
+st.html("""
 <div style="
     border-top: 1px solid #DCE5EF;
     margin-top: 40px;
@@ -1012,4 +1017,4 @@ st.markdown("""
     Prototipo académico de inteligencia artificial aplicada
     a la disponibilidad de espacios universitarios.
 </div>
-""", unsafe_allow_html=True)
+""")
