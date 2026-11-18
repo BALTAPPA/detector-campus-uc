@@ -20,8 +20,9 @@ st.title("🏫 Detector de disponibilidad - Campus UC")
 
 CARPETA = Path(__file__).parent
 
+
 # =====================================
-# 2. CARGAR FOTOGRAFIAS
+# 2. BUSCAR FOTOGRAFIAS
 # =====================================
 
 def buscar_fotografias(numeros):
@@ -30,18 +31,15 @@ def buscar_fotografias(numeros):
 
     for numero in numeros:
 
-        posibles_nombres = [
-            f"foto_{numero:02d}.jpg",
-            f"foto_{numero:02d}.jpeg",
-            f"foto_{numero:02d}.png"
-        ]
+        nombre_base = f"foto_{numero:02d}"
 
-        for nombre in posibles_nombres:
+        for archivo in CARPETA.iterdir():
 
-            ruta = CARPETA / nombre
-
-            if ruta.exists():
-                fotografias.append(ruta)
+            if (
+                archivo.stem.lower() == nombre_base
+                and archivo.suffix.lower() in [".jpg", ".jpeg", ".png"]
+            ):
+                fotografias.append(archivo)
                 break
 
     return fotografias
@@ -103,8 +101,11 @@ def analizar_fotografia(ruta_foto, modelo, mesas):
 
         x1, y1, x2, y2 = coordenadas
 
-        # Ajustar coordenadas a la fotografia
+        # Ordenar coordenadas para evitar errores
+        x1, x2 = sorted([x1, x2])
+        y1, y2 = sorted([y1, y2])
 
+        # Ajustar coordenadas al tamaño de la fotografia
         x1 = max(0, min(x1, ancho))
         x2 = max(0, min(x2, ancho))
 
@@ -132,8 +133,7 @@ def analizar_fotografia(ruta_foto, modelo, mesas):
 # 5. COORDENADAS DE LAS MESAS
 # =====================================
 
-# PATIO 1
-# Coordenadas actuales del primer patio
+# PATIO 1: 5 MESAS
 
 mesas_patio_1 = {
     "MESA 1": [100, 200, 240, 330],
@@ -144,21 +144,102 @@ mesas_patio_1 = {
 }
 
 
-# PATIO 2
-# Estas coordenadas son provisionales.
-# Hay que ajustarlas a las fotografias del segundo patio.
+# PATIO 2: 10 MESAS
+# Coordenadas iniciales provisionales.
+# Se pueden modificar desde la aplicacion.
 
-mesas_patio_2 = {
-    "MESA 1": [100, 200, 240, 330],
-    "MESA 2": [430, 220, 540, 320],
-    "MESA 3": [570, 250, 680, 350],
-    "MESA 4": [760, 380, 880, 480],
-    "MESA 5": [240, 380, 500, 520]
+COORDENADAS_INICIALES_PATIO_2 = {
+    f"MESA {i}": [100, 100, 200, 200]
+    for i in range(1, 11)
 }
 
 
 # =====================================
-# 6. FUNCION PARA MOSTRAR CADA PATIO
+# 6. CONFIGURACION DE MESAS PATIO 2
+# =====================================
+
+def configurar_mesas_patio_2():
+
+    st.subheader("⚙️ Configuración de mesas - Patio 2")
+
+    st.write(
+        "Modifica las coordenadas de cada mesa "
+        "para ajustarlas a su ubicación en la fotografía."
+    )
+
+    # Inicializar coordenadas
+    if "coordenadas_patio_2" not in st.session_state:
+
+        st.session_state.coordenadas_patio_2 = {
+            nombre: coordenadas.copy()
+            for nombre, coordenadas
+            in COORDENADAS_INICIALES_PATIO_2.items()
+        }
+
+    # Configuracion individual de cada mesa
+
+    for i in range(1, 11):
+
+        nombre = f"MESA {i}"
+
+        with st.expander(nombre):
+
+            coordenadas = st.session_state.coordenadas_patio_2[nombre]
+
+            x1, y1, x2, y2 = coordenadas
+
+            col1, col2 = st.columns(2)
+
+            with col1:
+
+                nuevo_x1 = st.slider(
+                    "X inicial",
+                    min_value=0,
+                    max_value=2000,
+                    value=x1,
+                    key=f"x1_p2_{i}"
+                )
+
+                nuevo_y1 = st.slider(
+                    "Y inicial",
+                    min_value=0,
+                    max_value=2000,
+                    value=y1,
+                    key=f"y1_p2_{i}"
+                )
+
+            with col2:
+
+                nuevo_x2 = st.slider(
+                    "X final",
+                    min_value=0,
+                    max_value=2000,
+                    value=x2,
+                    key=f"x2_p2_{i}"
+                )
+
+                nuevo_y2 = st.slider(
+                    "Y final",
+                    min_value=0,
+                    max_value=2000,
+                    value=y2,
+                    key=f"y2_p2_{i}"
+                )
+
+            # Guardar nuevas coordenadas
+
+            st.session_state.coordenadas_patio_2[nombre] = [
+                nuevo_x1,
+                nuevo_y1,
+                nuevo_x2,
+                nuevo_y2
+            ]
+
+    return st.session_state.coordenadas_patio_2
+
+
+# =====================================
+# 7. FUNCION PARA MOSTRAR CADA PATIO
 # =====================================
 
 def mostrar_patio(nombre_patio, fotografias, mesas, clave):
@@ -168,21 +249,29 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
     if len(fotografias) == 0:
 
         st.error(
-            f"No se encontraron fotografias para {nombre_patio}."
+            f"No se encontraron fotografías para {nombre_patio}."
         )
 
         return
 
     # ---------------------------------
-    # SELECCION DE FOTOGRAFIA
+    # CLAVES INDEPENDIENTES
     # ---------------------------------
 
     clave_foto = f"foto_actual_{clave}"
     clave_procesada = f"foto_procesada_{clave}"
     clave_estados = f"estados_mesas_{clave}"
     clave_personas = f"cantidad_personas_{clave}"
+    clave_configuracion = f"configuracion_procesada_{clave}"
 
-    if clave_foto not in st.session_state:
+    # ---------------------------------
+    # SELECCIONAR FOTOGRAFIA
+    # ---------------------------------
+
+    if (
+        clave_foto not in st.session_state
+        or st.session_state[clave_foto] not in fotografias
+    ):
 
         st.session_state[clave_foto] = random.choice(fotografias)
 
@@ -191,7 +280,7 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
     with col1:
 
         if st.button(
-            "🔄 Cambiar fotografia",
+            "🔄 Cambiar fotografía",
             key=f"boton_{clave}"
         ):
 
@@ -206,10 +295,10 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
 
             else:
 
-                st.info("Solo hay una fotografia disponible.")
+                st.info("Solo hay una fotografía disponible.")
 
     # ---------------------------------
-    # MINIATURA
+    # MINIATURA DE LA FOTOGRAFIA
     # ---------------------------------
 
     with col1:
@@ -222,16 +311,33 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
         st.caption(st.session_state[clave_foto].name)
 
     # ---------------------------------
-    # ANALISIS DE LA FOTOGRAFIA
+    # COMPROBAR CAMBIOS
     # ---------------------------------
 
-    modelo = cargar_modelo()
+    firma_foto = str(st.session_state[clave_foto])
 
-    if (
+    firma_coordenadas = tuple(
+        (nombre, tuple(coordenadas))
+        for nombre, coordenadas in mesas.items()
+    )
+
+    # Reanalizar si cambia la fotografia
+    # o las coordenadas de las mesas
+
+    necesita_analisis = (
         clave_procesada not in st.session_state
-        or st.session_state[clave_procesada]
-        != str(st.session_state[clave_foto])
-    ):
+        or st.session_state[clave_procesada] != firma_foto
+        or clave_configuracion not in st.session_state
+        or st.session_state[clave_configuracion] != firma_coordenadas
+    )
+
+    # ---------------------------------
+    # ANALIZAR FOTOGRAFIA
+    # ---------------------------------
+
+    if necesita_analisis:
+
+        modelo = cargar_modelo()
 
         with st.spinner(f"Analizando {nombre_patio}..."):
 
@@ -244,12 +350,12 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
             st.session_state[clave_estados] = estados
             st.session_state[clave_personas] = cantidad_personas
 
-            st.session_state[clave_procesada] = str(
-                st.session_state[clave_foto]
-            )
+            st.session_state[clave_procesada] = firma_foto
+
+            st.session_state[clave_configuracion] = firma_coordenadas
 
     # ---------------------------------
-    # RESULTADOS INDEPENDIENTES
+    # RESULTADOS
     # ---------------------------------
 
     estados = st.session_state[clave_estados]
@@ -315,20 +421,22 @@ def mostrar_patio(nombre_patio, fotografias, mesas, clave):
 
     nombres_mesas = list(mesas.keys())
 
-    # Mostrar las mesas en filas de tres
+    # Mostrar mesas en filas de tres
 
     for inicio in range(0, len(nombres_mesas), 3):
 
         columnas = st.columns(3)
 
-        for i, nombre in enumerate(nombres_mesas[inicio:inicio + 3]):
+        for i, nombre in enumerate(
+            nombres_mesas[inicio:inicio + 3]
+        ):
 
             with columnas[i]:
                 mostrar_mesa(nombre)
 
 
 # =====================================
-# 7. PESTAÑAS DE LA APLICACION
+# 8. PESTAÑAS
 # =====================================
 
 pestana1, pestana2, pestana3 = st.tabs([
@@ -357,6 +465,10 @@ with pestana1:
 # =====================================
 
 with pestana2:
+
+    mesas_patio_2 = configurar_mesas_patio_2()
+
+    st.divider()
 
     mostrar_patio(
         "Patio 2",
