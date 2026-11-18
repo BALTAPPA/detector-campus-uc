@@ -7,6 +7,7 @@ from PIL import Image
 from ultralytics import YOLO
 from datetime import date, timedelta
 
+
 # =====================================
 # 1. CONFIGURACION DE LA PAGINA
 # =====================================
@@ -23,6 +24,7 @@ st.write(
     "Sistema de análisis de ocupación del campus mediante "
     "inteligencia artificial y estimaciones de actividad académica."
 )
+
 
 # =====================================
 # 2. FUNCIONES GENERALES
@@ -50,6 +52,7 @@ def calcular_interseccion(caja_mesa, caja_persona):
 
 @st.cache_resource
 def cargar_modelo():
+
     return YOLO("yolov8n.pt")
 
 
@@ -72,8 +75,8 @@ with pestana1:
     st.header("Disponibilidad actual")
 
     st.write(
-        "El sistema selecciona una fotografía de la base de datos "
-        "del campus y analiza la disponibilidad de las mesas."
+        "Selecciona fotografías del campus automáticamente "
+        "y consulta la disponibilidad de las mesas."
     )
 
     # =================================
@@ -82,337 +85,260 @@ with pestana1:
 
     CARPETA = Path(__file__).resolve().parent
 
-    FOTOGRAFIAS = [
+    FOTOGRAFIAS = sorted([
         foto for foto in CARPETA.iterdir()
         if foto.is_file()
         and foto.suffix.lower() in [".jpg", ".jpeg", ".png"]
-    ]
+    ])
 
-    FOTOGRAFIAS = sorted(FOTOGRAFIAS)
+    if FOTOGRAFIAS:
 
-    # =================================
-    # 6. SELECCIONAR FOTOGRAFIA
-    # =================================
+        # =================================
+        # 6. SELECCIONAR FOTOGRAFIA
+        # =================================
 
-    if "foto_seleccionada" not in st.session_state:
+        if (
+            "foto_seleccionada" not in st.session_state
+            or st.session_state.foto_seleccionada
+            not in [str(f) for f in FOTOGRAFIAS]
+        ):
 
-        if FOTOGRAFIAS:
             st.session_state.foto_seleccionada = str(
                 random.choice(FOTOGRAFIAS)
             )
-        else:
-            st.session_state.foto_seleccionada = None
-
-    if FOTOGRAFIAS:
 
         # Botón para cambiar fotografía
         if st.button("🔄 Cambiar fotografía"):
 
             fotos_disponibles = [
-                str(foto) for foto in FOTOGRAFIAS
+                str(foto)
+                for foto in FOTOGRAFIAS
                 if str(foto) != st.session_state.foto_seleccionada
             ]
 
             if fotos_disponibles:
 
-                st.session_state.foto_seleccionada = str(
+                st.session_state.foto_seleccionada = (
                     random.choice(fotos_disponibles)
                 )
 
-        # Mostrar nombre de la fotografía
-        st.caption(
-            "Fotografía seleccionada: "
-            + Path(st.session_state.foto_seleccionada).name
-        )
+        # =================================
+        # 7. MOSTRAR FOTOGRAFIA PEQUEÑA
+        # =================================
 
-        # Abrir fotografía
-        imagen = Image.open(
-            st.session_state.foto_seleccionada
-        ).convert("RGB")
+        ruta_foto = st.session_state.foto_seleccionada
+
+        imagen = Image.open(ruta_foto).convert("RGB")
 
         ancho, alto = imagen.size
 
         st.image(
             imagen,
-            caption="Fotografía seleccionada del campus",
-            use_container_width=True
+            caption=Path(ruta_foto).name,
+            width=260
         )
 
         # =================================
-        # 7. CARGAR MODELO Y DETECTAR PERSONAS
+        # 8. COORDENADAS INTERNAS DE LAS MESAS
         # =================================
 
-        with st.spinner("Cargando inteligencia artificial..."):
+        # Las coordenadas no aparecen en la interfaz.
+        # Se utilizan internamente para localizar las mesas
+        # dentro de la fotografía.
 
-            modelo = cargar_modelo()
+        mesas = {
+            "Mesa 1": [100, 200, 240, 330],
+            "Mesa 2": [430, 220, 540, 320],
+            "Mesa 3": [570, 250, 680, 350],
+            "Mesa 4": [760, 380, 880, 480],
+            "Mesa 5": [240, 380, 500, 520]
+        }
 
-        with st.spinner("Detectando personas..."):
+        # Ajustar las coordenadas al tamaño de la imagen
 
-            resultados = modelo.predict(
-                source=imagen,
-                classes=[0],
-                conf=0.25,
-                verbose=False
-            )[0]
+        for nombre, caja in mesas.items():
 
-        personas = []
-
-        for box in resultados.boxes:
-
-            coordenadas = box.xyxy[0].cpu().numpy()
-
-            personas.append(coordenadas.tolist())
-
-        st.write(
-            f"Personas detectadas: **{len(personas)}**"
-        )
+            caja[0] = min(caja[0], ancho - 1)
+            caja[1] = min(caja[1], alto - 1)
+            caja[2] = min(caja[2], ancho)
+            caja[3] = min(caja[3], alto)
 
         # =================================
-        # 8. CONFIGURAR LAS 5 MESAS
+        # 9. DETECTAR PERSONAS CON YOLO
+        # =================================
+
+        # Los resultados se vuelven a calcular
+        # cuando se selecciona una fotografía diferente.
+
+        if (
+            "foto_procesada" not in st.session_state
+            or st.session_state.foto_procesada != ruta_foto
+        ):
+
+            with st.spinner("Cargando inteligencia artificial..."):
+
+                modelo = cargar_modelo()
+
+            with st.spinner("Analizando fotografía y detectando personas..."):
+
+                resultados = modelo.predict(
+                    source=imagen,
+                    classes=[0],
+                    conf=0.25,
+                    verbose=False
+                )[0]
+
+                personas = []
+
+                for box in resultados.boxes:
+
+                    coordenadas = box.xyxy[0].cpu().numpy()
+
+                    personas.append(coordenadas.tolist())
+
+                # =================================
+                # 10. ANALIZAR LAS CINCO MESAS
+                # =================================
+
+                estados = {}
+
+                for nombre, coordenadas in mesas.items():
+
+                    ocupada = False
+
+                    for persona in personas:
+
+                        if calcular_interseccion(
+                            coordenadas,
+                            persona
+                        ):
+
+                            ocupada = True
+                            break
+
+                    estados[nombre] = (
+                        "OCUPADA" if ocupada else "DISPONIBLE"
+                    )
+
+                # Guardar resultados en la sesión
+
+                st.session_state.estados_mesas = estados
+                st.session_state.foto_procesada = ruta_foto
+                st.session_state.personas_detectadas = len(personas)
+
+        # Recuperar resultados guardados
+
+        estados = st.session_state.estados_mesas
+
+        # =================================
+        # 11. MAPA DE DISPONIBILIDAD
         # =================================
 
         st.divider()
-        st.subheader("Configuración de las mesas")
 
-        coordenadas_iniciales = [
-            ([100, 240], [200, 330]),
-            ([430, 540], [220, 320]),
-            ([570, 680], [250, 350]),
-            ([760, 880], [380, 480]),
-            ([240, 500], [380, 520])
+        st.subheader("Mapa de disponibilidad")
+
+        ocupadas = sum(
+            estado == "OCUPADA"
+            for estado in estados.values()
+        )
+
+        disponibles = 5 - ocupadas
+
+        filas = [
+            ["Mesa 1", "Mesa 2", "Mesa 3"],
+            ["Mesa 4", "Mesa 5"]
         ]
 
-        mesas = {}
+        for fila in filas:
 
-        columnas = st.columns(2)
+            columnas_mapa = st.columns(3)
 
-        for i in range(5):
+            for i in range(3):
 
-            nombre = f"Mesa {i + 1}"
+                with columnas_mapa[i]:
 
-            x_inicial = coordenadas_iniciales[i][0]
-            y_inicial = coordenadas_iniciales[i][1]
+                    if i < len(fila):
 
-            x_min = min(x_inicial[0], ancho - 1)
-            x_max = min(x_inicial[1], ancho)
+                        nombre = fila[i]
+                        estado = estados[nombre]
 
-            y_min = min(y_inicial[0], alto - 1)
-            y_max = min(y_inicial[1], alto)
+                        if estado == "DISPONIBLE":
 
-            if x_max <= x_min:
-                x_min, x_max = 0, ancho
-
-            if y_max <= y_min:
-                y_min, y_max = 0, alto
-
-            with columnas[i % 2]:
-
-                with st.expander(
-                    nombre,
-                    expanded=(i == 0)
-                ):
-
-                    x1, x2 = st.slider(
-                        f"Coordenadas X - {nombre}",
-                        0,
-                        ancho,
-                        (x_min, x_max),
-                        key=f"x_{i}"
-                    )
-
-                    y1, y2 = st.slider(
-                        f"Coordenadas Y - {nombre}",
-                        0,
-                        alto,
-                        (y_min, y_max),
-                        key=f"y_{i}"
-                    )
-
-                    mesas[nombre] = [
-                        x1, y1, x2, y2
-                    ]
-
-        # =================================
-        # 9. ANALIZAR DISPONIBILIDAD
-        # =================================
-
-        if st.button(
-            "ANALIZAR DISPONIBILIDAD",
-            type="primary"
-        ):
-
-            estados = {}
-
-            for nombre, coordenadas in mesas.items():
-
-                ocupada = False
-
-                for persona in personas:
-
-                    if calcular_interseccion(
-                        coordenadas,
-                        persona
-                    ):
-
-                        ocupada = True
-                        break
-
-                estados[nombre] = (
-                    "OCUPADA" if ocupada else "DISPONIBLE"
-                )
-
-            # =================================
-            # 10. ESTADISTICAS
-            # =================================
-
-            ocupadas = sum(
-                estado == "OCUPADA"
-                for estado in estados.values()
-            )
-
-            disponibles = 5 - ocupadas
-
-            # =================================
-            # 11. MAPA ESQUEMATICO
-            # =================================
-
-            st.divider()
-            st.subheader("Mapa de disponibilidad")
-
-            st.markdown("""
-            <style>
-            .mesa {
-                border-radius: 12px;
-                min-height: 115px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-                margin: 8px;
-                font-weight: bold;
-                box-shadow: 0px 3px 8px rgba(0,0,0,0.10);
-            }
-
-            .disponible {
-                background-color: #bbf7d0;
-                border: 3px solid #16a34a;
-                color: #166534;
-            }
-
-            .ocupada {
-                background-color: #fecaca;
-                border: 3px solid #dc2626;
-                color: #991b1b;
-            }
-
-            .mesa span {
-                font-size: 22px;
-            }
-
-            .mesa small {
-                font-size: 13px;
-                font-weight: normal;
-                margin-top: 6px;
-            }
-
-            .leyenda {
-                display: flex;
-                gap: 25px;
-                justify-content: center;
-                margin-top: 20px;
-                font-size: 14px;
-            }
-
-            .punto {
-                display: inline-block;
-                width: 13px;
-                height: 13px;
-                border-radius: 50%;
-                margin-right: 6px;
-            }
-            </style>
-            """, unsafe_allow_html=True)
-
-            # Distribución de las mesas
-            filas = [
-                ["Mesa 1", "Mesa 2", "Mesa 3"],
-                ["Mesa 4", "Mesa 5"]
-            ]
-
-            for fila in filas:
-
-                columnas_mapa = st.columns(3)
-
-                for i in range(3):
-
-                    with columnas_mapa[i]:
-
-                        if i < len(fila):
-
-                            nombre = fila[i]
-                            estado = estados[nombre]
-
-                            if estado == "DISPONIBLE":
-
-                                clase = "disponible"
-                                simbolo = "✓"
-
-                            else:
-
-                                clase = "ocupada"
-                                simbolo = "✕"
-
-                            st.markdown(
-                                f"""
-                                <div class="mesa {clase}">
-                                    <span>{nombre}</span>
-                                    <span>{simbolo}</span>
-                                    <small>{estado}</small>
-                                </div>
-                                """,
-                                unsafe_allow_html=True
-                            )
+                            color_fondo = "#bbf7d0"
+                            color_texto = "#166534"
+                            simbolo = "✓"
 
                         else:
 
-                            st.markdown(
-                                "<div style='height:131px'></div>",
-                                unsafe_allow_html=True
-                            )
+                            color_fondo = "#fecaca"
+                            color_texto = "#991b1b"
+                            simbolo = "✕"
 
-            # Leyenda
-            st.markdown("""
-            <div class="leyenda">
-                <div>
-                    <span class="punto" style="background:#16a34a"></span>
-                    Disponible
-                </div>
-                <div>
-                    <span class="punto" style="background:#dc2626"></span>
-                    Ocupada
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+                        st.markdown(
+                            f"""
+                            <div style="
+                                background:{color_fondo};
+                                color:{color_texto};
+                                border-radius:12px;
+                                border:2px solid {color_texto};
+                                min-height:115px;
+                                display:flex;
+                                flex-direction:column;
+                                align-items:center;
+                                justify-content:center;
+                                margin:5px;
+                                font-weight:bold;
+                            ">
+                                <span style="font-size:20px;">
+                                    {nombre}
+                                </span>
 
-            # =================================
-            # 12. MOSTRAR ESTADISTICAS
-            # =================================
+                                <span style="font-size:25px;">
+                                    {simbolo}
+                                </span>
 
-            st.divider()
-            st.subheader("Estado general")
+                                <span style="font-size:13px;">
+                                    {estado}
+                                </span>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
 
-            col1, col2, col3 = st.columns(3)
+                    else:
 
-            col1.metric("Total de mesas", 5)
-            col2.metric("Disponibles", disponibles)
-            col3.metric("Ocupadas", ocupadas)
+                        st.markdown(
+                            "<div style='height:125px'></div>",
+                            unsafe_allow_html=True
+                        )
 
-            st.info(
-                "El sistema estima la ocupación mediante "
-                "la intersección entre personas detectadas "
-                "y las zonas definidas para cada mesa."
-            )
+        # =================================
+        # 12. ESTADISTICAS GENERALES
+        # =================================
+
+        st.divider()
+
+        st.subheader("Estado general")
+
+        col1, col2, col3 = st.columns(3)
+
+        col1.metric("Total de mesas", 5)
+
+        col2.metric("Disponibles", disponibles)
+
+        col3.metric("Ocupadas", ocupadas)
+
+        st.caption(
+            f"Personas detectadas en la fotografía: "
+            f"{st.session_state.personas_detectadas}"
+        )
+
+        st.info(
+            "La disponibilidad se estima mediante la "
+            "intersección entre las personas detectadas "
+            "y las zonas correspondientes a cada mesa."
+        )
 
     else:
 
@@ -424,7 +350,7 @@ with pestana1:
 
 
 # ==========================================================
-# PESTAÑA 2: PREDICCION DEL CAMPUS
+# PESTAÑA 2: PREDICCION DE OCUPACION DEL CAMPUS
 # ==========================================================
 
 with pestana2:
@@ -438,9 +364,9 @@ with pestana2:
     )
 
     st.info(
-        "Los porcentajes son estimaciones iniciales basadas en "
-        "reglas académicas. No corresponden a mediciones reales "
-        "de personas presentes en el campus."
+        "Los porcentajes son estimaciones iniciales basadas "
+        "en reglas académicas. No corresponden a mediciones "
+        "reales de personas presentes en el campus."
     )
 
     # =================================
@@ -470,12 +396,15 @@ with pestana2:
         dia = fecha.weekday()
 
         # Fin de semana
+
         if dia >= 5:
+
             return None, "Fin de semana", (
                 "No se estima actividad académica regular."
             )
 
         # Fechas fuera del segundo periodo
+
         if fecha < INICIO_CLASES or fecha > FIN_PERIODO:
 
             return None, "Sin datos del periodo", (
@@ -484,6 +413,7 @@ with pestana2:
             )
 
         # Receso académico
+
         if INICIO_RECESO <= fecha <= FIN_RECESO:
 
             return 10, "Receso académico", (
@@ -491,6 +421,7 @@ with pestana2:
             )
 
         # Suspensión de actividades
+
         if fecha == SUSPENSION:
 
             return 0, "Suspensión de actividades", (
@@ -498,6 +429,7 @@ with pestana2:
             )
 
         # Feriado
+
         if fecha == FERIADO:
 
             return 0, "Feriado", (
@@ -505,6 +437,7 @@ with pestana2:
             )
 
         # Periodo de evaluaciones
+
         if INICIO_EVALUACIONES <= fecha <= FIN_EVALUACIONES:
 
             valores_evaluacion = {
@@ -523,6 +456,7 @@ with pestana2:
             )
 
         # Cierre del periodo
+
         if fecha > FIN_EVALUACIONES:
 
             return 25, "Cierre del periodo académico", (
@@ -547,18 +481,22 @@ with pestana2:
                 "Actividad media: cursos teóricos, electivos "
                 "y trabajo autónomo."
             ),
+
             1: (
                 "Actividad muy alta: talleres de Arquitectura, "
                 "correcciones y revisiones de proyectos."
             ),
+
             2: (
                 "Actividad media: clases teóricas, laboratorios "
                 "y desarrollo autónomo de proyectos."
             ),
+
             3: (
                 "Actividad muy alta: talleres, correcciones "
                 "y trabajo presencial de Arquitectura."
             ),
+
             4: (
                 "Actividad alta: entregas, presentaciones "
                 "y revisiones de proyectos."
@@ -576,6 +514,7 @@ with pestana2:
     # =================================
 
     st.divider()
+
     st.subheader("Consultar actividad semanal")
 
     fecha_seleccionada = st.date_input(
@@ -585,7 +524,8 @@ with pestana2:
         max_value=date(2027, 12, 31)
     )
 
-    # Encontrar lunes de la semana
+    # Encontrar el lunes de esa semana
+
     lunes = fecha_seleccionada - timedelta(
         days=fecha_seleccionada.weekday()
     )
@@ -635,6 +575,7 @@ with pestana2:
             if porcentaje is None:
 
                 st.metric("Estimación", "N/D")
+
                 st.caption(etapa)
 
             else:
@@ -647,15 +588,19 @@ with pestana2:
                 st.progress(porcentaje / 100)
 
                 if porcentaje >= 80:
+
                     st.error("Actividad muy alta")
 
                 elif porcentaje >= 65:
+
                     st.warning("Actividad alta")
 
                 elif porcentaje >= 40:
+
                     st.info("Actividad media")
 
                 else:
+
                     st.success("Actividad baja")
 
     # =================================
@@ -663,6 +608,7 @@ with pestana2:
     # =================================
 
     st.divider()
+
     st.subheader("Detalle de la semana")
 
     for prediccion in predicciones:
@@ -690,6 +636,7 @@ with pestana2:
     # =================================
 
     st.divider()
+
     st.subheader("Resumen semanal")
 
     dias_validos = [
