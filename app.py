@@ -1,7 +1,7 @@
 
 import streamlit as st
 import numpy as np
-from PIL import Image, ImageDraw
+from PIL import Image
 from ultralytics import YOLO
 
 # =====================================
@@ -70,8 +70,7 @@ if archivo is not None:
 
     ancho, alto = imagen.size
 
-    st.subheader("Fotografia original")
-    st.image(imagen, use_container_width=True)
+    st.success("Fotografia cargada correctamente.")
 
     # Detectar personas
     with st.spinner("Detectando personas..."):
@@ -89,16 +88,14 @@ if archivo is not None:
         coordenadas = box.xyxy[0].cpu().numpy()
         personas.append(coordenadas.tolist())
 
-    st.success(
-        f"Personas detectadas: {len(personas)}"
-    )
+    st.write(f"Personas detectadas: **{len(personas)}**")
 
     # =================================
     # 6. CALIBRAR LAS 5 MESAS
     # =================================
 
     st.divider()
-    st.subheader("Calibracion de las 5 mesas")
+    st.subheader("Configuracion de las mesas")
 
     coordenadas_iniciales = [
         ([100, 240], [200, 330]),
@@ -116,7 +113,6 @@ if archivo is not None:
 
         nombre = f"Mesa {i + 1}"
 
-        # Adaptar coordenadas al tamaño de la imagen
         x_inicial = coordenadas_iniciales[i][0]
         y_inicial = coordenadas_iniciales[i][1]
 
@@ -175,72 +171,8 @@ if archivo is not None:
             )
 
         # =================================
-        # 8. DIBUJAR RESULTADOS
+        # 8. CALCULAR ESTADISTICAS
         # =================================
-
-        capa = Image.new(
-            "RGBA",
-            imagen.size,
-            (0, 0, 0, 0)
-        )
-
-        dibujo = ImageDraw.Draw(capa)
-
-        # Dibujar mesas
-        for nombre, coordenadas in mesas.items():
-
-            x1, y1, x2, y2 = coordenadas
-
-            if estados[nombre] == "OCUPADA":
-                color = (255, 0, 0, 85)
-                borde = "red"
-            else:
-                color = (0, 255, 0, 85)
-                borde = "lime"
-
-            dibujo.rectangle(
-                [x1, y1, x2, y2],
-                fill=color,
-                outline=borde,
-                width=4
-            )
-
-            dibujo.text(
-                (x1 + 5, y1 + 5),
-                f"{nombre}: {estados[nombre]}",
-                fill="white",
-                stroke_width=2,
-                stroke_fill="black"
-            )
-
-        # Dibujar personas detectadas
-        for persona in personas:
-
-            px1, py1, px2, py2 = map(int, persona)
-
-            dibujo.rectangle(
-                [px1, py1, px2, py2],
-                outline="yellow",
-                width=3
-            )
-
-        imagen_final = Image.alpha_composite(
-            imagen.convert("RGBA"),
-            capa
-        ).convert("RGB")
-
-        # =================================
-        # 9. MOSTRAR RESULTADOS
-        # =================================
-
-        st.divider()
-        st.subheader("Resultado del analisis")
-
-        st.image(
-            imagen_final,
-            caption="Deteccion de ocupacion",
-            use_container_width=True
-        )
 
         ocupadas = sum(
             estado == "OCUPADA"
@@ -249,20 +181,152 @@ if archivo is not None:
 
         disponibles = 5 - ocupadas
 
+        # =================================
+        # 9. MOSTRAR MAPA ESQUEMATICO
+        # =================================
+
+        st.divider()
+        st.subheader("Mapa de disponibilidad")
+
+        st.markdown("""
+        <style>
+        .mapa {
+            background-color: #f1f2f3;
+            border: 1px solid #d1d5db;
+            border-radius: 15px;
+            padding: 35px;
+            min-height: 350px;
+        }
+
+        .mesa {
+            border-radius: 12px;
+            min-height: 115px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            margin: 8px;
+            font-weight: bold;
+            box-shadow: 0px 3px 8px rgba(0,0,0,0.10);
+        }
+
+        .disponible {
+            background-color: #bbf7d0;
+            border: 3px solid #16a34a;
+            color: #166534;
+        }
+
+        .ocupada {
+            background-color: #fecaca;
+            border: 3px solid #dc2626;
+            color: #991b1b;
+        }
+
+        .mesa span {
+            font-size: 22px;
+        }
+
+        .mesa small {
+            font-size: 13px;
+            font-weight: normal;
+            margin-top: 6px;
+        }
+
+        .leyenda {
+            display: flex;
+            gap: 25px;
+            justify-content: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .punto {
+            display: inline-block;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Posiciones esquematicas del mapa
+        posiciones = [
+            (0, 0),  # Mesa 1
+            (0, 1),  # Mesa 2
+            (0, 2),  # Mesa 3
+            (1, 0),  # Mesa 4
+            (1, 1),  # Mesa 5
+        ]
+
+        # Distribucion en dos filas
+        filas = [
+            ["Mesa 1", "Mesa 2", "Mesa 3"],
+            ["Mesa 4", "Mesa 5"]
+        ]
+
+        for fila in filas:
+
+            columnas_mapa = st.columns(3)
+
+            for i in range(3):
+
+                with columnas_mapa[i]:
+
+                    if i < len(fila):
+
+                        nombre = fila[i]
+                        estado = estados[nombre]
+
+                        if estado == "DISPONIBLE":
+                            clase = "disponible"
+                            simbolo = "✓"
+                        else:
+                            clase = "ocupada"
+                            simbolo = "✕"
+
+                        st.markdown(
+                            f"""
+                            <div class="mesa {clase}">
+                                <span>{nombre}</span>
+                                <span>{simbolo}</span>
+                                <small>{estado}</small>
+                            </div>
+                            """,
+                            unsafe_allow_html=True
+                        )
+
+                    else:
+                        st.markdown("<div style='height:131px'></div>",
+                                    unsafe_allow_html=True)
+
+        # Leyenda
+        st.markdown("""
+        <div class="leyenda">
+            <div>
+                <span class="punto" style="background:#16a34a"></span>
+                Disponible
+            </div>
+            <div>
+                <span class="punto" style="background:#dc2626"></span>
+                Ocupada
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # =================================
+        # 10. ESTADISTICAS
+        # =================================
+
+        st.divider()
+        st.subheader("Estado general")
+
         col1, col2, col3 = st.columns(3)
 
         col1.metric("Total de mesas", 5)
         col2.metric("Disponibles", disponibles)
         col3.metric("Ocupadas", ocupadas)
-
-        st.subheader("Reporte de ocupacion")
-
-        for mesa, estado in estados.items():
-
-            if estado == "OCUPADA":
-                st.error(f"🔴 {mesa}: OCUPADA")
-            else:
-                st.success(f"🟢 {mesa}: DISPONIBLE")
 
         st.info(
             "El sistema estima la ocupacion mediante "
